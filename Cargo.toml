@@ -2,5 +2,14 @@
 name = "raptor"
 version = "0.1.0"
 edition = "2024"
+authors = ["keogami <https://github.com/keogami>"]
 
-[dependencies]
+[lib]
+name = "raptor"
+path = "src/lib.rs"
+
+[dev-dependencies]
+anyhow = "1.0.100"
+
+[profile.dev]
+debug = "full"
