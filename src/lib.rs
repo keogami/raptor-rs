@@ -52,8 +52,6 @@ pub trait Timetable {
         let mut Q = BTreeMap::<Self::Route, Self::Stop>::new();
 
         for k in 1..transfers {
-            println!("Running for k = {k}");
-            println!("marked stops = {marked_stops:#?}");
             Q.clear();
             // find all routes that serve the marked stops, for evaluation in this round
             for &marked_stop in &marked_stops {
@@ -64,44 +62,33 @@ pub trait Timetable {
                 }
             }
 
-            println!("Q after section 1: {Q:#?}");
-
             marked_stops.clear();
 
             // scanning each route
             for (&route, &p) in Q.iter() {
                 let mut current_trip: Option<Self::Trip> = None;
-                println!("scanning route = {route:?} with p = {p:?}");
 
-                for mut pi in self.get_stops_after(route, p) {
-                    current_trip = dbg!(current_trip);
-                    pi = dbg!(pi);
+                for pi in self.get_stops_after(route, p) {
                     if let Some(arr) = current_trip.map(|trip| self.get_arrival_time(trip, pi)) {
                         let best_arrival_to_target = best_arrival.get(&pt).unwrap_or(&Tau::MAX);
                         let best_arrival_to_pi = best_arrival.get(&pi).unwrap_or(&Tau::MAX);
-                        let time_to_beat =
-                            *dbg!(best_arrival_to_pi).min(dbg!(best_arrival_to_target));
+                        let time_to_beat = *best_arrival_to_pi.min(best_arrival_to_target);
 
-                        if dbg!(dbg!(arr) < time_to_beat) {
+                        if arr < time_to_beat {
                             best_arrival_per_k.insert((k, pi), arr);
                             best_arrival.insert(pi, arr);
                             marked_stops.insert(pi);
                         }
                     }
 
-                    let t_prev_pi =
-                        dbg!(*best_arrival_per_k.get(&(k - 1, pi)).unwrap_or(&Tau::MAX));
+                    let t_prev_pi = *best_arrival_per_k.get(&(k - 1, pi)).unwrap_or(&Tau::MAX);
                     if t_prev_pi
-                        <= dbg!(
-                            current_trip
-                                .map(|trip| self.get_departure_time(trip, pi))
-                                .unwrap_or(Tau::MAX)
-                        )
+                        <= current_trip
+                            .map(|trip| self.get_departure_time(trip, pi))
+                            .unwrap_or(Tau::MAX)
                     {
                         current_trip = self.get_earliest_trip(route, t_prev_pi, pi);
                     }
-
-                    println!("\n")
                 }
             }
 
