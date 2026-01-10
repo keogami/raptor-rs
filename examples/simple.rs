@@ -55,5 +55,7 @@ impl Timetable for SingleRoute {
 fn main() {
     let mock = SingleRoute;
 
-    mock.raptor(10, 0, 0, 9);
+    let journey = mock.raptor(10, 0, 0, 9);
+
+    println!("{journey:#?}");
 }
