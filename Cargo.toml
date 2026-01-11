@@ -10,6 +10,11 @@ path = "src/lib.rs"
 
 [dev-dependencies]
 anyhow = "1.0.100"
+humantime = "2"
 
 [profile.dev]
 debug = "full"
+
+[dependencies]
+gtfs-structures = "0.46.1"
+smallvec = "1.15.1"
