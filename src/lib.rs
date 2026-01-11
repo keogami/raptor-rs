@@ -1,6 +1,8 @@
 // TODO: define trait to replicate the raptor's model of the network
 // TODO: define the journey struct
 
+pub mod gtfs;
+
 use std::collections::{BTreeMap, BTreeSet};
 use std::fmt::Debug;
 

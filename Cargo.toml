@@ -8,6 +8,9 @@ authors = ["keogami <https://github.com/keogami>"]
 name = "raptor"
 path = "src/lib.rs"
 
+[dependencies]
+gtfs-structures = "0.42"
+
 [dev-dependencies]
 anyhow = "1.0.100"
 
