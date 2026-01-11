@@ -3,6 +3,9 @@ name = "raptor"
 version = "0.1.0"
 edition = "2024"
 authors = ["keogami <https://github.com/keogami>"]
+description = "Rust impl of RAPTOR (Round-bAsed Public Transit Routing)"
+license = "Apache-2.0"
+repository = "https://github.com/keogami/raptor-rs"
 
 [lib]
 name = "raptor"
