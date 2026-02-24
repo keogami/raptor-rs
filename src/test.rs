@@ -1,19 +1,25 @@
 use std::collections::BTreeMap;
+use std::fmt::Debug;
 
 use crate::{Tau, Timetable};
 
-pub struct TestTimetable {
+pub struct TestTimetable<S, R, T> {
     /// route_id -> ordered stop sequence
-    routes: BTreeMap<usize, Vec<usize>>,
+    routes: BTreeMap<R, Vec<S>>,
     /// trip_id -> (route_id, per-stop (arrival, departure) aligned with route's stop order)
-    trips: BTreeMap<usize, (usize, Vec<(Tau, Tau)>)>,
+    trips: BTreeMap<T, (R, Vec<(Tau, Tau)>)>,
     /// stop -> reachable stops via footpath
-    footpaths: BTreeMap<usize, Vec<usize>>,
+    footpaths: BTreeMap<S, Vec<S>>,
     /// (from, to) -> transfer time
-    transfer_times: BTreeMap<(usize, usize), Tau>,
+    transfer_times: BTreeMap<(S, S), Tau>,
 }
 
-impl TestTimetable {
+impl<S, R, T> TestTimetable<S, R, T>
+where
+    S: Ord + Copy,
+    R: Ord + Copy,
+    T: Ord + Copy,
+{
     fn new() -> Self {
         Self {
             routes: BTreeMap::new(),
@@ -23,13 +29,17 @@ impl TestTimetable {
         }
     }
 
-    fn route(mut self, id: usize, stops: &[usize], trips: &[(usize, &[(Tau, Tau)])]) -> Self {
+    fn route(mut self, id: R, stops: &[S], trips: &[(T, &[(Tau, Tau)])]) -> Self
+    where
+        R: Debug,
+        T: Debug,
+    {
         self.routes.insert(id, stops.to_vec());
         for &(trip_id, times) in trips {
             assert_eq!(
                 times.len(),
                 stops.len(),
-                "trip {trip_id} has {} times but route {id} has {} stops",
+                "trip {trip_id:?} has {} times but route {id:?} has {} stops",
                 times.len(),
                 stops.len()
             );
@@ -38,24 +48,28 @@ impl TestTimetable {
         self
     }
 
-    fn footpath(mut self, from: usize, to: usize) -> Self {
+    fn footpath(mut self, from: S, to: S) -> Self {
         self.footpaths.entry(from).or_default().push(to);
         self
     }
 
-    fn transfer_time(mut self, from: usize, to: usize, time: Tau) -> Self {
+    fn transfer_time(mut self, from: S, to: S, time: Tau) -> Self {
         self.transfer_times.insert((from, to), time);
         self
     }
 }
 
-impl From<(&[(usize, &[usize], &[(usize, &[(Tau, Tau)])])], &[(usize, usize)])>
-    for TestTimetable
+impl<S, R, T> From<(&[(R, &[S], &[(T, &[(Tau, Tau)])])], &[(S, S)])>
+    for TestTimetable<S, R, T>
+where
+    S: Ord + Copy,
+    R: Ord + Copy + Debug,
+    T: Ord + Copy + Debug,
 {
     fn from(
         (route_defs, footpath_defs): (
-            &[(usize, &[usize], &[(usize, &[(Tau, Tau)])])],
-            &[(usize, usize)],
+            &[(R, &[S], &[(T, &[(Tau, Tau)])])],
+            &[(S, S)],
         ),
     ) -> Self {
         let mut tt = Self::new();
@@ -65,7 +79,7 @@ impl From<(&[(usize, &[usize], &[(usize, &[(Tau, Tau)])])], &[(usize, usize)])>
                 assert_eq!(
                     times.len(),
                     stops.len(),
-                    "trip {trip_id} has {} times but route {route_id} has {} stops",
+                    "trip {trip_id:?} has {} times but route {route_id:?} has {} stops",
                     times.len(),
                     stops.len()
                 );
@@ -79,10 +93,15 @@ impl From<(&[(usize, &[usize], &[(usize, &[(Tau, Tau)])])], &[(usize, usize)])>
     }
 }
 
-impl Timetable for TestTimetable {
-    type Stop = usize;
-    type Route = usize;
-    type Trip = usize;
+impl<S, R, T> Timetable for TestTimetable<S, R, T>
+where
+    S: Ord + Copy + Debug,
+    R: Ord + Copy + Debug,
+    T: Ord + Copy + Debug,
+{
+    type Stop = S;
+    type Route = R;
+    type Trip = T;
 
     fn get_routes_serving_stop(&self, stop: Self::Stop) -> Vec<Self::Route> {
         self.routes
@@ -152,54 +171,79 @@ impl Timetable for TestTimetable {
 
 /// Recreates the Issue1 network from examples/reconstruction_bugs.rs
 ///
-/// Stop mapping: S=0, A=1, B=2, C=3, D=4
-/// Route mapping: R1=0, R2=1, R3=2
-/// Trip mapping: R1's trip=10, R2's trip=20, R3/T1(late)=31, R3/T2(early)=32
+/// Stop mapping: S, A, B, C, D
+/// Route mapping: R1, R2, R3
+/// Trip mapping: R1T1, R2T1, R3Late, R3Early
 #[test]
 fn reconstruction_bugs_issue1() {
+    use Route::*;
+    use Stop::*;
+    use Trip::*;
+
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+    enum Stop { S, A, B, C, D }
+
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+    enum Route { R1, R2, R3 }
+
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+    enum Trip { R1T1, R2T1, R3Late, R3Early }
+
     let tt = TestTimetable::new()
-        .route(0, &[0, 1], &[(10, &[(0, 0), (100, 100)])])
-        .route(1, &[0, 2], &[(20, &[(0, 0), (30, 30)])])
+        .route(R1, &[S, A], &[(R1T1, &[(0, 0), (100, 100)])])
+        .route(R2, &[S, B], &[(R2T1, &[(0, 0), (30, 30)])])
         .route(
-            2,
-            &[1, 2, 3, 4],
+            R3,
+            &[A, B, C, D],
             &[
-                (31, &[(105, 105), (110, 110), (120, 120), (130, 130)]),
-                (32, &[(25, 25), (30, 30), (40, 40), (50, 50)]),
+                (R3Late, &[(105, 105), (110, 110), (120, 120), (130, 130)]),
+                (R3Early, &[(25, 25), (30, 30), (40, 40), (50, 50)]),
             ],
         );
 
-    let journeys = tt.raptor(3, 0, 0, 4);
+    let journeys = tt.raptor(3, 0, S, D);
 
-    // The optimal journey: S→B via R2, then B→D via R3/T2, arriving at t=50
-    // Plan: [(R2, S), (R3, B)] = [(1, 0), (2, 2)]
+    // The optimal journey: S->B via R2, then B->D via R3/Early, arriving at t=50
     assert!(!journeys.is_empty(), "should find at least one journey");
 
     let best = journeys.iter().min_by_key(|j| j.arrival).unwrap();
     assert_eq!(best.arrival, 50);
-    assert_eq!(best.plan, vec![(1, 0), (2, 2)]);
+    assert_eq!(best.plan, vec![(R2, S), (R3, B)]);
 }
 
 /// Same test using the From impl for static declaration
 #[test]
 fn reconstruction_bugs_issue1_from() {
-    let routes: &[(usize, &[usize], &[(usize, &[(Tau, Tau)])])] = &[
-        (0, &[0, 1], &[(10, &[(0, 0), (100, 100)])]),
-        (1, &[0, 2], &[(20, &[(0, 0), (30, 30)])]),
+    use Route::*;
+    use Stop::*;
+    use Trip::*;
+
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+    enum Stop { S, A, B, C, D }
+
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+    enum Route { R1, R2, R3 }
+
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+    enum Trip { R1T1, R2T1, R3Late, R3Early }
+
+    let routes: &[(Route, &[Stop], &[(Trip, &[(Tau, Tau)])])] = &[
+        (R1, &[S, A], &[(R1T1, &[(0, 0), (100, 100)])]),
+        (R2, &[S, B], &[(R2T1, &[(0, 0), (30, 30)])]),
         (
-            2,
-            &[1, 2, 3, 4],
+            R3,
+            &[A, B, C, D],
             &[
-                (31, &[(105, 105), (110, 110), (120, 120), (130, 130)]),
-                (32, &[(25, 25), (30, 30), (40, 40), (50, 50)]),
+                (R3Late, &[(105, 105), (110, 110), (120, 120), (130, 130)]),
+                (R3Early, &[(25, 25), (30, 30), (40, 40), (50, 50)]),
             ],
         ),
     ];
     let tt = TestTimetable::from((routes, &[] as &[_]));
 
-    let journeys = tt.raptor(3, 0, 0, 4);
+    let journeys = tt.raptor(3, 0, S, D);
 
     let best = journeys.iter().min_by_key(|j| j.arrival).unwrap();
     assert_eq!(best.arrival, 50);
-    assert_eq!(best.plan, vec![(1, 0), (2, 2)]);
+    assert_eq!(best.plan, vec![(R2, S), (R3, B)]);
 }
