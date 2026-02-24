@@ -6,6 +6,11 @@ use raptor::{gtfs::GtfsTimetable, Journey, Timetable};
 use std::{env, time::Duration};
 
 fn main() -> anyhow::Result<()> {
+    env_logger::Builder::from_env(
+        env_logger::Env::new().filter_or("RAPTOR_EXAMPLE_LOG_LEVEL", "info"),
+    )
+    .init();
+
     let args: Vec<String> = env::args().collect();
     if args.len() != 4 {
         eprintln!(

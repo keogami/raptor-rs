@@ -53,6 +53,11 @@ impl Timetable for SingleRoute {
 }
 
 fn main() {
+    env_logger::Builder::from_env(
+        env_logger::Env::new().filter_or("RAPTOR_EXAMPLE_LOG_LEVEL", "info"),
+    )
+    .init();
+
     let mock = SingleRoute;
 
     let journey = mock.raptor(10, 0, 0, 9);
