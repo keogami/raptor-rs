@@ -3,6 +3,9 @@ use std::fmt::Debug;
 
 pub mod gtfs;
 
+#[cfg(test)]
+mod test;
+
 pub type K = usize;
 pub type Tau = usize;
 
