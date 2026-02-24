@@ -2,7 +2,7 @@
 
 use gtfs_structures::Gtfs;
 use humantime::format_duration;
-use raptor::{gtfs::GtfsTimetable, Journey, Timetable};
+use raptor::{Journey, Timetable, gtfs::GtfsTimetable};
 use std::{env, time::Duration};
 
 fn main() -> anyhow::Result<()> {
@@ -48,11 +48,7 @@ fn main() -> anyhow::Result<()> {
     // Pretty print journeys
     for (i, journey) in journeys.iter().enumerate() {
         let travel_time = Duration::from_secs((journey.arrival - departure_time) as u64);
-        println!(
-            "Journey {} ({}):",
-            i + 1,
-            format_duration(travel_time)
-        );
+        println!("Journey {} ({}):", i + 1, format_duration(travel_time));
         print_journey(&timetable, &gtfs, journey, target);
         println!();
     }
@@ -60,7 +56,12 @@ fn main() -> anyhow::Result<()> {
     Ok(())
 }
 
-fn print_journey(timetable: &GtfsTimetable, gtfs: &Gtfs, journey: &Journey<usize, usize>, target: usize) {
+fn print_journey(
+    timetable: &GtfsTimetable,
+    gtfs: &Gtfs,
+    journey: &Journey<usize, usize>,
+    target: usize,
+) {
     // Format: "stop_name" -["route_name"]-> "stop_name" ...
     let plan = &journey.plan;
 
