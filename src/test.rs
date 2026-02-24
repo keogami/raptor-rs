@@ -208,7 +208,7 @@ fn reconstruction_bugs_issue1() {
 
     let best = journeys.iter().min_by_key(|j| j.arrival).unwrap();
     assert_eq!(best.arrival, 50);
-    assert_eq!(best.plan, vec![(R2, S), (R3, B)]);
+    assert_eq!(best.plan, vec![(R2, B), (R3, D)]);
 }
 
 /// Same test using the From impl for static declaration
@@ -245,7 +245,7 @@ fn reconstruction_bugs_issue1_from() {
 
     let best = journeys.iter().min_by_key(|j| j.arrival).unwrap();
     assert_eq!(best.arrival, 50);
-    assert_eq!(best.plan, vec![(R2, S), (R3, B)]);
+    assert_eq!(best.plan, vec![(R2, B), (R3, D)]);
 }
 
 // ── Edge case tests ─────────────────────────────────────────────────
@@ -349,7 +349,7 @@ fn direct_journey_single_route() {
     let journeys = tt.raptor(3, 0, Stop::A, Stop::C);
     assert_eq!(journeys.len(), 1);
     assert_eq!(journeys[0].arrival, 20);
-    assert_eq!(journeys[0].plan, vec![(Route::R1, Stop::A)]);
+    assert_eq!(journeys[0].plan, vec![(Route::R1, Stop::C)]);
 }
 
 #[test]
@@ -387,7 +387,7 @@ fn exact_time_connection() {
     assert!(!journeys.is_empty(), "exact-time connection should work");
     let best = journeys.iter().min_by_key(|j| j.arrival).unwrap();
     assert_eq!(best.arrival, 30);
-    assert_eq!(best.plan, vec![(Route::R1, Stop::A), (Route::R2, Stop::B)]);
+    assert_eq!(best.plan, vec![(Route::R1, Stop::B), (Route::R2, Stop::C)]);
 }
 
 #[test]
@@ -431,9 +431,9 @@ fn two_transfer_journey() {
     let best = journeys.iter().min_by_key(|j| j.arrival).unwrap();
     assert_eq!(best.arrival, 30);
     assert_eq!(best.plan, vec![
-        (Route::R1, Stop::A),
-        (Route::R2, Stop::B),
-        (Route::R3, Stop::C),
+        (Route::R1, Stop::B),
+        (Route::R2, Stop::C),
+        (Route::R3, Stop::D),
     ]);
 }
 

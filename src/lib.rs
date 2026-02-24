@@ -53,7 +53,7 @@ where
                 break;
             };
 
-            plan.push((route, stop));
+            plan.push((route, parent));
             parent = stop;
         }
 
