@@ -39,12 +39,17 @@ where
         let mut plan = Vec::with_capacity(k);
         let mut parent = pt;
 
+        log::debug!("outer_k = {k} | parent = {parent:?} | plans = {plans:?}");
+
         for inner_k in (1..=k).rev() {
+            log::debug!("inner_k = {inner_k} | parent = {parent:?} | plan = {plan:?}");
             if parent == ps {
+                log::debug!("stopping because parent is ps");
                 break;
             }
 
             let Some((stop, route)) = tree.get(&(inner_k, parent)).copied() else {
+                log::debug!("stopping because tree has no entry for current (inner_k, parent)");
                 break;
             };
 

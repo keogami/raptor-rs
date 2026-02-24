@@ -194,6 +194,11 @@ impl Timetable for Issue1Timetable {
 }
 
 fn main() {
+    env_logger::Builder::from_env(
+        env_logger::Env::new().filter_or("RAPTOR_EXAMPLE_LOG_LEVEL", "info"),
+    )
+    .init();
+
     println!("============================================================");
     println!("     RAPTOR Journey Reconstruction Bug Demonstration");
     println!("============================================================\n");
