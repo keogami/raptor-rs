@@ -24,12 +24,27 @@ let journeys = my_timetable.raptor(
 );
 
 for journey in &journeys {
-    println!("arrives at {} with {} leg(s)", journey.arrival, journey.plan.len());
+    println!("arrives at {} with {} step(s)", journey.arrival, journey.plan.len());
 }
 ```
 
 Each journey in the result is pareto-optimal: no other journey arrives earlier
 with the same or fewer transfers.
+
+## Reading a Journey
+
+A `Journey` has a `plan` and an `arrival` time. The plan is a list of
+(route, stop) pairs — each entry means "take this route, get off at this stop".
+The source stop is implicit; it's not part of the plan.
+
+For example, going from stop `"A"` to stop `"D"` with two transfers:
+
+```json
+[("R1", "B"), ("R2", "C"), ("R3", "D")]
+```
+
+Read as: board `R1` at `A`, get off at `B`, board `R2` at `B`, get off at `C`,
+board `R3` at `C`, get off at `D`.
 
 ## GTFS Support
 

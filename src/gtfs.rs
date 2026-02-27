@@ -1,6 +1,6 @@
 //! [`Timetable`] implementation backed by a GTFS feed.
 //!
-//! Wraps a parsed [`Gtfs`](gtfs_structures::Gtfs) object and pre-computes lookup indices
+//! Wraps a parsed [`Gtfs`] object and pre-computes lookup indices
 //! for efficient route, stop, and trip queries.
 
 use std::{borrow::Cow, collections::BTreeMap};

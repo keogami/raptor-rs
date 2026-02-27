@@ -24,7 +24,6 @@ use std::borrow::Cow;
 use std::collections::{BTreeMap, BTreeSet};
 use std::fmt::Debug;
 
-/// GTFS-based [`Timetable`] implementation.
 pub mod gtfs;
 
 #[cfg(test)]
@@ -38,15 +37,30 @@ pub type Tau = usize;
 
 /// A journey found by the RAPTOR algorithm.
 ///
-/// Each journey consists of a sequence of legs (route, arrival stop) and a final arrival time.
+/// Each journey consists of a sequence of steps (route, arrival stop) and a final arrival time.
 /// Multiple journeys may be returned for a single query, representing pareto-optimal trade-offs
 /// between fewer transfers and earlier arrival.
 #[derive(Debug, Clone)]
 pub struct Journey<Route, Stop> {
-    /// Sequence of legs, each a (route, arrival stop) pair.
+    /// Sequence of steps, each a (route, stop to get off at) pair.
     ///
-    /// The first leg boards at the source stop. Each subsequent leg boards at the
-    /// arrival stop of the previous leg.
+    /// The source stop is implicit — it is not part of the plan. Each entry means
+    /// "take this route until this stop". The first step boards at the source stop
+    /// passed to [`Timetable::raptor`], and each subsequent step boards at the stop
+    /// where the previous step got off.
+    ///
+    /// For example, going from stop `"A"` to stop `"D"` with two transfers, the plan
+    /// would look like:
+    ///
+    /// ```json
+    /// [("R1", "B"), ("R2", "C"), ("R3", "D")]
+    /// ```
+    ///
+    /// Read as: board `R1` at `A`, get off at `B`, board `R2` at `B`, get off at `C`,
+    /// board `R3` at `C`, get off at `D`.
+    ///
+    /// See the [`gtfs-timetable`](https://github.com/keogami/raptor-rs/blob/main/examples/gtfs-timetable.rs)
+    /// example for how to interpret and display a plan.
     pub plan: Vec<(Route, Stop)>,
     /// Arrival time at the target stop, in seconds since midnight.
     pub arrival: Tau,
@@ -159,7 +173,7 @@ pub trait Timetable {
     /// Runs the RAPTOR algorithm and returns all pareto-optimal journeys.
     ///
     /// Finds journeys from `ps` (source) to `pt` (target) departing at or after `tau`,
-    /// using at most `transfers` legs. Returns a set of pareto-optimal journeys trading
+    /// using at most `transfers` steps. Returns a set of pareto-optimal journeys trading
     /// off between fewer transfers and earlier arrival.
     ///
     /// Returns an empty `Vec` if no journey exists.
