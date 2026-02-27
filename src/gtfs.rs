@@ -5,54 +5,46 @@ use smallvec::SmallVec;
 
 use crate::Timetable;
 
-type Route = usize;
-type Trip = usize;
-type Stop = usize;
+const TYPICAL_ROUTES_PER_STOP: usize = 8;
+const TYPICAL_STOPS_PER_ROUTE: usize = 32;
 
-type RoutesForStops = BTreeMap<Stop, SmallVec<[Route; 8]>>;
-type StopForRoutes = BTreeMap<Route, SmallVec<[Stop; 32]>>;
-type TripsForRoutes = BTreeMap<Route, Vec<Trip>>;
+type RoutesForStops<'gtfs> = BTreeMap<&'gtfs str, SmallVec<[&'gtfs str; TYPICAL_ROUTES_PER_STOP]>>;
+type StopForRoutes<'gtfs> = BTreeMap<&'gtfs str, SmallVec<[&'gtfs str; TYPICAL_STOPS_PER_ROUTE]>>;
+type TripsForRoutes<'gtfs> = BTreeMap<&'gtfs str, Vec<&'gtfs str>>;
+
+#[derive(thiserror::Error, Debug)]
+pub enum GtfsError {
+    // empty
+}
+
+type GtfsResult<T> = std::result::Result<T, GtfsError>;
 
 pub struct GtfsTimetable<'gtfs> {
     gtfs: &'gtfs Gtfs,
 
-    stops: Vec<&'gtfs str>,
-    trips: Vec<&'gtfs str>,
-    routes: Vec<&'gtfs str>,
-
     // can use docs.rs/arc-swap's cache for realtime support
-    routes_for_stops: OnceLock<RoutesForStops>,
-    stops_for_routes: OnceLock<StopForRoutes>,
-    trips_for_routes: OnceLock<TripsForRoutes>,
+    routes_for_stops: OnceLock<RoutesForStops<'gtfs>>,
+    stops_for_routes: OnceLock<StopForRoutes<'gtfs>>,
+    trips_for_routes: OnceLock<TripsForRoutes<'gtfs>>,
 }
 
 impl<'a> GtfsTimetable<'a> {
-    pub fn new(gtfs: &'a Gtfs) -> Self {
-        let mut stops: Vec<_> = gtfs.stops.keys().map(String::as_str).collect();
-        stops.sort();
-        let mut routes: Vec<_> = gtfs.routes.keys().map(String::as_str).collect();
-        routes.sort();
-        let mut trips: Vec<_> = gtfs.trips.keys().map(String::as_str).collect();
-        trips.sort();
-
-        Self {
+    pub fn new(gtfs: &'a Gtfs) -> GtfsResult<Self> {
+        Ok(Self {
             gtfs,
-            stops,
-            routes,
-            trips,
             routes_for_stops: Default::default(),
             stops_for_routes: Default::default(),
             trips_for_routes: Default::default(),
-        }
+        })
     }
 
-    fn cache_routes_for_stops(&self) -> RoutesForStops {
+    fn cache_routes_for_stops(&self) -> RoutesForStops<'a> {
         let mut routes_for_stops = RoutesForStops::default();
 
         for trip in self.gtfs.trips.values() {
-            let route = self.route_idx(&trip.route_id).unwrap();
+            let route = trip.route_id.as_str();
             for st in &trip.stop_times {
-                let stop = self.stop_idx(&st.stop.id).unwrap();
+                let stop = st.stop.id.as_str();
                 routes_for_stops.entry(stop).or_default().push(route);
             }
         }
@@ -60,11 +52,11 @@ impl<'a> GtfsTimetable<'a> {
         routes_for_stops
     }
 
-    fn cache_stops_for_routes(&self) -> StopForRoutes {
+    fn cache_stops_for_routes(&self) -> StopForRoutes<'a> {
         let mut stops_for_routes = StopForRoutes::default();
 
         for trip in self.gtfs.trips.values() {
-            let route = self.route_idx(&trip.route_id).unwrap();
+            let route = trip.route_id.as_str();
             // TODO: handle case where multiple trips run on a route but with different patterns
             // which require merging stops in a meaningful way
 
@@ -73,7 +65,7 @@ impl<'a> GtfsTimetable<'a> {
             }
 
             for st in &trip.stop_times {
-                let stop = self.stop_idx(&st.stop.id).unwrap();
+                let stop = st.stop.id.as_str();
                 stops_for_routes.entry(route).or_default().push(stop);
             }
         }
@@ -81,19 +73,18 @@ impl<'a> GtfsTimetable<'a> {
         stops_for_routes
     }
 
-    fn cache_trips_for_routes(&self) -> TripsForRoutes {
+    fn cache_trips_for_routes(&self) -> TripsForRoutes<'a> {
         let mut trips_for_routes = TripsForRoutes::default();
 
         for (trip_id, trip) in &self.gtfs.trips {
-            let route = self.route_idx(&trip.route_id).unwrap();
-            let trip_idx = self.trip_idx(trip_id).unwrap();
+            let route = trip.route_id.as_str();
+            let trip_idx = trip_id.as_str();
             trips_for_routes.entry(route).or_default().push(trip_idx);
         }
 
         // Sort each route's trips by first stop departure time
         for trips in trips_for_routes.values_mut() {
-            trips.sort_by_key(|&trip_idx| {
-                let trip_id = &self.trips[trip_idx];
+            trips.sort_by_key(|&trip_id| {
                 let trip = self.gtfs.get_trip(trip_id).unwrap();
                 trip.stop_times
                     .first()
@@ -104,36 +95,12 @@ impl<'a> GtfsTimetable<'a> {
 
         trips_for_routes
     }
-
-    fn stop_idx(&self, id: &str) -> Option<usize> {
-        self.stops.binary_search_by(|item| (*item).cmp(id)).ok()
-    }
-    fn trip_idx(&self, id: &str) -> Option<usize> {
-        self.trips.binary_search_by(|item| (*item).cmp(id)).ok()
-    }
-    fn route_idx(&self, id: &str) -> Option<usize> {
-        self.routes.binary_search_by(|item| (*item).cmp(id)).ok()
-    }
-
-    pub fn resolve_stop(&self, idx: usize) -> Option<&str> {
-        self.stops.get(idx).copied()
-    }
-
-    pub fn resolve_route(&self, idx: usize) -> Option<&str> {
-        self.routes.get(idx).copied()
-    }
-
-    pub fn lookup_stop(&self, id: &str) -> Option<usize> {
-        self.stop_idx(id)
-    }
 }
 
-impl Timetable for GtfsTimetable<'_> {
-    type Stop = usize;
-
-    type Route = usize;
-
-    type Trip = usize;
+impl<'gtfs> Timetable for GtfsTimetable<'gtfs> {
+    type Stop = &'gtfs str;
+    type Route = &'gtfs str;
+    type Trip = &'gtfs str;
 
     fn get_routes_serving_stop(&self, stop: Self::Stop) -> Vec<Self::Route> {
         self.routes_for_stops
@@ -191,79 +158,65 @@ impl Timetable for GtfsTimetable<'_> {
             .get_or_init(|| self.cache_trips_for_routes())
             .get(&route)?;
 
-        let stop_id = *self.stops.get(stop)?;
-
-        let departure_at_stop = |trip_idx: usize| -> Option<crate::Tau> {
-            let trip_id = self.trips[trip_idx];
-            let trip = self.gtfs.get_trip(trip_id).unwrap();
+        let departure_at_stop = |trip: &str| -> Option<crate::Tau> {
+            let trip = self.gtfs.get_trip(trip).unwrap();
             trip.stop_times
                 .iter()
-                .find(|st| st.stop.id == stop_id)
+                .find(|st| st.stop.id == stop)
                 .and_then(|st| st.departure_time)
                 .map(|t| t as crate::Tau)
         };
 
         // Binary search: find partition point where departure >= at
-        let idx = trips.partition_point(|&trip_idx| {
-            departure_at_stop(trip_idx)
-                .map(|dep| dep < at)
-                .unwrap_or(true) // trips not serving this stop sort "before"
+        let idx = trips.partition_point(|&trip| {
+            departure_at_stop(trip).map(|dep| dep < at).unwrap_or(true) // trips not serving this stop sort "before"
         });
 
         // Scan forward to find first trip actually serving this stop
         trips[idx..]
             .iter()
-            .find(|&&trip_idx| departure_at_stop(trip_idx).is_some())
+            .find(|&&trip| departure_at_stop(trip).is_some())
             .copied()
     }
 
     fn get_arrival_time(&self, trip: Self::Trip, stop: Self::Stop) -> crate::Tau {
-        let trip_id = self.trips[trip];
-        let stop_id = self.stops[stop];
-        let trip = self.gtfs.get_trip(trip_id).unwrap();
+        let trip = self.gtfs.get_trip(trip).unwrap();
 
         trip.stop_times
             .iter()
-            .find(|st| st.stop.id == stop_id)
+            .find(|st| st.stop.id == stop)
             .and_then(|st| st.arrival_time)
             .expect("valid inputs") as crate::Tau
     }
 
     fn get_departure_time(&self, trip: Self::Trip, stop: Self::Stop) -> crate::Tau {
-        let trip_id = self.trips[trip];
-        let stop_id = self.stops[stop];
-        let trip = self.gtfs.get_trip(trip_id).unwrap();
+        let trip = self.gtfs.get_trip(trip).unwrap();
 
         trip.stop_times
             .iter()
-            .find(|st| st.stop.id == stop_id)
+            .find(|st| st.stop.id == stop)
             .and_then(|st| st.departure_time)
             .expect("valid inputs") as crate::Tau
     }
 
     fn get_footpaths_from(&self, stop: Self::Stop) -> Vec<Self::Stop> {
-        let stop_id = self.stops[stop];
-
         self.gtfs
-            .get_stop(stop_id)
+            .get_stop(stop)
             .unwrap()
             .transfers
             .iter()
-            .filter_map(|t| self.stop_idx(&t.to_stop_id))
+            .map(|t| t.to_stop_id.as_str())
             .collect()
     }
 
     // TODO: handle TransferType to distinguish between timed transfers and walking
     fn get_transfer_time(&self, from: Self::Stop, to: Self::Stop) -> crate::Tau {
-        let from_stop_id = self.stops[from];
-        let to_stop_id = self.stops[to];
-
         self.gtfs
-            .get_stop(from_stop_id)
+            .get_stop(from)
             .unwrap()
             .transfers
             .iter()
-            .find(|t| t.to_stop_id == to_stop_id)
+            .find(|t| t.to_stop_id == to)
             .and_then(|t| t.min_transfer_time)
             .map(|t| t as crate::Tau)
             .unwrap_or(300) // default 5 minutes
