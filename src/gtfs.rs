@@ -115,6 +115,14 @@ impl<'a> GtfsTimetable<'a> {
     }
 }
 
+fn find_stop_time<'a>(gtfs: &'a Gtfs, trip: &str, stop: &str) -> &'a gtfs_structures::StopTime {
+    let trip = gtfs.get_trip(trip).expect("validated during construction");
+    trip.stop_times
+        .iter()
+        .find(|st| st.stop.id == stop)
+        .expect("valid inputs")
+}
+
 impl<'gtfs> Timetable for GtfsTimetable<'gtfs> {
     type Stop = &'gtfs str;
     type Route = &'gtfs str;
@@ -195,28 +203,14 @@ impl<'gtfs> Timetable for GtfsTimetable<'gtfs> {
     }
 
     fn get_arrival_time(&self, trip: Self::Trip, stop: Self::Stop) -> crate::Tau {
-        let trip = self
-            .gtfs
-            .get_trip(trip)
-            .expect("validated during construction");
-
-        trip.stop_times
-            .iter()
-            .find(|st| st.stop.id == stop)
-            .and_then(|st| st.arrival_time)
+        find_stop_time(self.gtfs, trip, stop)
+            .arrival_time
             .expect("valid inputs") as crate::Tau
     }
 
     fn get_departure_time(&self, trip: Self::Trip, stop: Self::Stop) -> crate::Tau {
-        let trip = self
-            .gtfs
-            .get_trip(trip)
-            .expect("validated during construction");
-
-        trip.stop_times
-            .iter()
-            .find(|st| st.stop.id == stop)
-            .and_then(|st| st.departure_time)
+        find_stop_time(self.gtfs, trip, stop)
+            .departure_time
             .expect("valid inputs") as crate::Tau
     }
 
