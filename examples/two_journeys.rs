@@ -1,6 +1,8 @@
 use raptor::{Tau, Timetable};
 
 // a single route with stops [0..10]
+const R1_STOPS: [usize; 4] = [2, 10, 11, 9];
+
 struct TwoRoutes;
 
 impl Timetable for TwoRoutes {
@@ -17,7 +19,7 @@ impl Timetable for TwoRoutes {
             routes.push("r0");
         }
 
-        if [2, 10, 11, 9].contains(&stop) {
+        if R1_STOPS.contains(&stop) {
             routes.push("r1")
         }
 
@@ -33,7 +35,7 @@ impl Timetable for TwoRoutes {
         if route == "r0" {
             left.min(right)
         } else {
-            let routes = [2, 10, 11, 9];
+            let routes = R1_STOPS;
 
             let left = routes.iter().position(|&a| a == left).unwrap();
             let right = routes.iter().position(|&a| a == right).unwrap();
@@ -49,7 +51,7 @@ impl Timetable for TwoRoutes {
             }
             (stop..10).collect()
         } else {
-            let routes = [2, 10, 11, 9];
+            let routes = R1_STOPS;
             let stop_idx = routes.iter().position(|&a| a == stop).unwrap();
 
             routes[stop_idx..].to_vec()
@@ -73,7 +75,7 @@ impl Timetable for TwoRoutes {
         if trip == 0 {
             stop * 10
         } else {
-            let routes = [2, 10, 11, 9];
+            let routes = R1_STOPS;
             let stop_idx = routes.iter().position(|&a| a == stop).unwrap();
 
             (stop_idx + 2) * 10
