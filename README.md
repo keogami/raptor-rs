@@ -39,7 +39,7 @@ The source stop is implicit; it's not part of the plan.
 
 For example, going from stop `"A"` to stop `"D"` with two transfers:
 
-```json
+```rust
 [("R1", "B"), ("R2", "C"), ("R3", "D")]
 ```
 
