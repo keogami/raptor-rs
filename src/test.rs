@@ -1,5 +1,5 @@
-use std::collections::BTreeMap;
 use std::fmt::Debug;
+use std::{borrow::Cow, collections::BTreeMap};
 
 use crate::{Tau, Timetable};
 
@@ -97,12 +97,13 @@ where
     type Route = R;
     type Trip = T;
 
-    fn get_routes_serving_stop(&self, stop: Self::Stop) -> Vec<Self::Route> {
+    fn get_routes_serving_stop(&self, stop: Self::Stop) -> Cow<'_, [Self::Route]> {
         self.routes
             .iter()
             .filter(|(_, stops)| stops.contains(&stop))
             .map(|(&route_id, _)| route_id)
-            .collect()
+            .collect::<Vec<_>>()
+            .into()
     }
 
     fn get_earlier_stop(
@@ -117,10 +118,10 @@ where
         stops[l.min(r)]
     }
 
-    fn get_stops_after(&self, route: Self::Route, stop: Self::Stop) -> Vec<Self::Stop> {
+    fn get_stops_after(&self, route: Self::Route, stop: Self::Stop) -> Cow<'_, [Self::Stop]> {
         let stops = &self.routes[&route];
         let pos = stops.iter().position(|&s| s == stop).unwrap();
-        stops[pos..].to_vec()
+        stops[pos..].into()
     }
 
     fn get_earliest_trip(
@@ -154,8 +155,12 @@ where
         times[idx].1
     }
 
-    fn get_footpaths_from(&self, stop: Self::Stop) -> Vec<Self::Stop> {
-        self.footpaths.get(&stop).cloned().unwrap_or_default()
+    fn get_footpaths_from(&self, stop: Self::Stop) -> Cow<'_, [Self::Stop]> {
+        self.footpaths
+            .get(&stop)
+            .map(|v| v.as_slice())
+            .unwrap_or(&[])
+            .into()
     }
 
     fn get_transfer_time(&self, from: Self::Stop, to: Self::Stop) -> Tau {

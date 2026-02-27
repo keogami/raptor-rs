@@ -45,9 +45,7 @@ fn main() -> anyhow::Result<()> {
         println!();
     }
 
-    println!();
-
-    println!("{journeys:#?}");
+    log::debug!("{journeys:#?}");
 
     Ok(())
 }

@@ -1,4 +1,4 @@
-use std::collections::BTreeMap;
+use std::{borrow::Cow, collections::BTreeMap};
 
 use gtfs_structures::Gtfs;
 use smallvec::SmallVec;
@@ -7,11 +7,14 @@ use crate::Timetable;
 
 const TYPICAL_ROUTES_PER_STOP: usize = 8;
 const TYPICAL_STOPS_PER_ROUTE: usize = 32;
+const TYPICAL_TRANSFERS_PER_STOP: usize = 4;
 const DEFAULT_TRANSFER_TIME_SECONDS: usize = 300;
 
 type RoutesForStops<'gtfs> = BTreeMap<&'gtfs str, SmallVec<[&'gtfs str; TYPICAL_ROUTES_PER_STOP]>>;
 type StopForRoutes<'gtfs> = BTreeMap<&'gtfs str, SmallVec<[&'gtfs str; TYPICAL_STOPS_PER_ROUTE]>>;
 type TripsForRoutes<'gtfs> = BTreeMap<&'gtfs str, Vec<&'gtfs str>>;
+type FootpathsForStops<'gtfs> =
+    BTreeMap<&'gtfs str, SmallVec<[&'gtfs str; TYPICAL_TRANSFERS_PER_STOP]>>;
 
 #[derive(thiserror::Error, Debug)]
 pub enum GtfsError {
@@ -32,6 +35,7 @@ pub struct GtfsTimetable<'gtfs> {
     routes_for_stops: RoutesForStops<'gtfs>,
     stops_for_routes: StopForRoutes<'gtfs>,
     trips_for_routes: TripsForRoutes<'gtfs>,
+    footpaths_for_stops: FootpathsForStops<'gtfs>,
 }
 
 impl<'a> GtfsTimetable<'a> {
@@ -39,12 +43,14 @@ impl<'a> GtfsTimetable<'a> {
         let routes_for_stops = Self::cache_routes_for_stops(gtfs)?;
         let stops_for_routes = Self::cache_stops_for_routes(gtfs)?;
         let trips_for_routes = Self::cache_trips_for_routes(gtfs)?;
+        let footpaths_for_stops = Self::cache_footpaths_for_stops(gtfs);
 
         Ok(Self {
             gtfs,
             routes_for_stops,
             stops_for_routes,
             trips_for_routes,
+            footpaths_for_stops,
         })
     }
 
@@ -89,6 +95,25 @@ impl<'a> GtfsTimetable<'a> {
         Ok(stops_for_routes)
     }
 
+    fn cache_footpaths_for_stops(gtfs: &'a Gtfs) -> FootpathsForStops<'a> {
+        let mut footpaths_for_stops = FootpathsForStops::default();
+
+        for (stop_id, stop) in &gtfs.stops {
+            if stop.transfers.is_empty() {
+                continue;
+            }
+
+            let targets: SmallVec<_> = stop
+                .transfers
+                .iter()
+                .map(|t| t.to_stop_id.as_str())
+                .collect();
+            footpaths_for_stops.insert(stop_id.as_str(), targets);
+        }
+
+        footpaths_for_stops
+    }
+
     fn cache_trips_for_routes(gtfs: &'a Gtfs) -> GtfsResult<TripsForRoutes<'a>> {
         let mut trips_for_routes = TripsForRoutes::default();
 
@@ -128,11 +153,12 @@ impl<'gtfs> Timetable for GtfsTimetable<'gtfs> {
     type Route = &'gtfs str;
     type Trip = &'gtfs str;
 
-    fn get_routes_serving_stop(&self, stop: Self::Stop) -> Vec<Self::Route> {
+    fn get_routes_serving_stop(&self, stop: Self::Stop) -> Cow<'_, [&'gtfs str]> {
         self.routes_for_stops
             .get(&stop)
-            .map(|sv| sv.to_vec())
-            .unwrap_or_default()
+            .map(|sv| sv.as_slice())
+            .unwrap_or(&[])
+            .into()
     }
 
     fn get_earlier_stop(
@@ -156,7 +182,7 @@ impl<'gtfs> Timetable for GtfsTimetable<'gtfs> {
         }
     }
 
-    fn get_stops_after(&self, route: Self::Route, stop: Self::Stop) -> Vec<Self::Stop> {
+    fn get_stops_after(&self, route: Self::Route, stop: Self::Stop) -> Cow<'_, [&'gtfs str]> {
         let stops = self
             .stops_for_routes
             .get(&route)
@@ -167,7 +193,7 @@ impl<'gtfs> Timetable for GtfsTimetable<'gtfs> {
             .position(|&s| s == stop)
             .expect("stop should exist on route");
 
-        stops[pos..].to_vec()
+        stops[pos..].into()
     }
 
     fn get_earliest_trip(
@@ -214,14 +240,12 @@ impl<'gtfs> Timetable for GtfsTimetable<'gtfs> {
             .expect("valid inputs") as crate::Tau
     }
 
-    fn get_footpaths_from(&self, stop: Self::Stop) -> Vec<Self::Stop> {
-        self.gtfs
-            .get_stop(stop)
-            .expect("validated during construction")
-            .transfers
-            .iter()
-            .map(|t| t.to_stop_id.as_str())
-            .collect()
+    fn get_footpaths_from(&self, stop: Self::Stop) -> Cow<'_, [Self::Stop]> {
+        self.footpaths_for_stops
+            .get(&stop)
+            .map(|sv| sv.as_slice())
+            .unwrap_or(&[])
+            .into()
     }
 
     // TODO: handle TransferType to distinguish between timed transfers and walking

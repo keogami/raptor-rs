@@ -1,7 +1,9 @@
+use std::borrow::Cow;
+
 use raptor::{Tau, Timetable};
 
-// a single route with stops [0..10]
 const R1_STOPS: [usize; 4] = [2, 10, 11, 9];
+const R0_STOPS: [usize; 10] = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9];
 
 struct TwoRoutes;
 
@@ -12,18 +14,16 @@ impl Timetable for TwoRoutes {
 
     type Trip = usize;
 
-    fn get_routes_serving_stop(&self, stop: Self::Stop) -> Vec<Self::Route> {
-        let mut routes = vec![];
+    fn get_routes_serving_stop(&self, stop: Self::Stop) -> Cow<'static, [Self::Route]> {
+        let in_r0 = R0_STOPS.contains(&stop);
+        let in_r1 = R1_STOPS.contains(&stop);
 
-        if (0..10).contains(&stop) {
-            routes.push("r0");
+        match (in_r0, in_r1) {
+            (true, true) => Cow::Borrowed(&["r0", "r1"]),
+            (true, false) => Cow::Borrowed(&["r0"]),
+            (false, true) => Cow::Borrowed(&["r1"]),
+            (false, false) => Cow::Borrowed(&[]),
         }
-
-        if R1_STOPS.contains(&stop) {
-            routes.push("r1")
-        }
-
-        routes
     }
 
     fn get_earlier_stop(
@@ -44,17 +44,12 @@ impl Timetable for TwoRoutes {
         }
     }
 
-    fn get_stops_after(&self, route: Self::Route, stop: Self::Stop) -> Vec<Self::Stop> {
+    fn get_stops_after(&self, route: Self::Route, stop: Self::Stop) -> Cow<'static, [Self::Stop]> {
         if route == "r0" {
-            if stop == 9 {
-                return vec![];
-            }
-            (stop..10).collect()
+            R0_STOPS[stop..].into()
         } else {
-            let routes = R1_STOPS;
-            let stop_idx = routes.iter().position(|&a| a == stop).unwrap();
-
-            routes[stop_idx..].to_vec()
+            let stop_idx = R1_STOPS.iter().position(|&a| a == stop).unwrap();
+            R1_STOPS[stop_idx..].into()
         }
     }
 
@@ -86,8 +81,12 @@ impl Timetable for TwoRoutes {
         self.get_arrival_time(trip, stop) + 5
     }
 
-    fn get_footpaths_from(&self, stop: Self::Stop) -> Vec<Self::Stop> {
-        if stop == 2 { vec![2] } else { vec![] }
+    fn get_footpaths_from(&self, stop: Self::Stop) -> Cow<'static, [Self::Stop]> {
+        if stop == 2 {
+            (&[2]).into()
+        } else {
+            (&[]).into()
+        }
     }
 }
 
