@@ -116,9 +116,7 @@ impl<'a> GtfsTimetable<'a> {
 }
 
 fn find_stop_time<'a>(gtfs: &'a Gtfs, trip: &str, stop: &str) -> &'a gtfs_structures::StopTime {
-    let trip = gtfs
-        .get_trip(trip)
-        .expect("validated during construction");
+    let trip = gtfs.get_trip(trip).expect("validated during construction");
     trip.stop_times
         .iter()
         .find(|st| st.stop.id == stop)
