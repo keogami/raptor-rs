@@ -155,8 +155,12 @@ where
         times[idx].1
     }
 
-    fn get_footpaths_from(&self, stop: Self::Stop) -> Vec<Self::Stop> {
-        self.footpaths.get(&stop).cloned().unwrap_or_default()
+    fn get_footpaths_from(&self, stop: Self::Stop) -> Cow<'_, [Self::Stop]> {
+        self.footpaths
+            .get(&stop)
+            .map(|v| v.as_slice())
+            .unwrap_or(&[])
+            .into()
     }
 
     fn get_transfer_time(&self, from: Self::Stop, to: Self::Stop) -> Tau {

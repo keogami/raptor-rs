@@ -81,8 +81,12 @@ impl Timetable for TwoRoutes {
         self.get_arrival_time(trip, stop) + 5
     }
 
-    fn get_footpaths_from(&self, stop: Self::Stop) -> Vec<Self::Stop> {
-        if stop == 2 { vec![2] } else { vec![] }
+    fn get_footpaths_from(&self, stop: Self::Stop) -> Cow<'static, [Self::Stop]> {
+        if stop == 2 {
+            [2].as_slice().into()
+        } else {
+            [].as_slice().into()
+        }
     }
 }
 

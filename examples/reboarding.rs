@@ -127,8 +127,8 @@ impl Timetable for ReBoardingTimetable {
         }
     }
 
-    fn get_footpaths_from(&self, _: Self::Stop) -> Vec<Self::Stop> {
-        vec![]
+    fn get_footpaths_from(&self, _: Self::Stop) -> Cow<'static, [Self::Stop]> {
+        [].as_slice().into()
     }
 }
 

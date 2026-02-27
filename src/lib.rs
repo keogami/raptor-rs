@@ -91,8 +91,7 @@ pub trait Timetable {
     ) -> Option<Self::Trip>;
     fn get_arrival_time(&self, trip: Self::Trip, stop: Self::Stop) -> Tau;
     fn get_departure_time(&self, trip: Self::Trip, stop: Self::Stop) -> Tau;
-    // TODO: replace vec with cow or iter
-    fn get_footpaths_from(&self, stop: Self::Stop) -> Vec<Self::Stop>;
+    fn get_footpaths_from(&self, stop: Self::Stop) -> Cow<'_, [Self::Stop]>;
     fn get_transfer_time(&self, from: Self::Stop, to: Self::Stop) -> Tau {
         let (_, _) = (from, to);
         1
@@ -165,7 +164,7 @@ pub trait Timetable {
             // look at footpaths, and mark the stops reachable
             let mut more_marked_stops = Vec::new();
             for &stop in &marked_stops {
-                for &p_dash in &self.get_footpaths_from(stop) {
+                for &p_dash in self.get_footpaths_from(stop).iter() {
                     let tau = best_arrival_per_k
                         .get(&(k, p_dash))
                         .copied()

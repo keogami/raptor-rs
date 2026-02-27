@@ -37,8 +37,8 @@ impl Timetable for SingleRoute {
         (stop * 10) + 5
     }
 
-    fn get_footpaths_from(&self, _stop: Self::Stop) -> Vec<Self::Stop> {
-        vec![]
+    fn get_footpaths_from(&self, _stop: Self::Stop) -> Cow<'static, [Self::Stop]> {
+        [].as_slice().into()
     }
 
     fn get_earliest_trip(
