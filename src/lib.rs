@@ -1,18 +1,54 @@
+#![deny(missing_docs)]
+
+//! Rust implementation of the RAPTOR (Round-bAsed Public Transit Routing) algorithm.
+//!
+//! RAPTOR computes pareto-optimal journeys in a public transit network, trading off
+//! between arrival time and number of transfers. Implement the [`Timetable`] trait
+//! for your transit data, then call [`Timetable::raptor`] to query for journeys.
+//!
+//! A ready-made implementation for GTFS feeds is available in the [`gtfs`] module.
+//!
+//! # Example
+//!
+//! ```no_run
+//! use raptor::Timetable;
+//!
+//! // implement Timetable for your transit data, then:
+//! // let journeys = timetable.raptor(max_transfers, departure_time, source, target);
+//! ```
+//!
+//! Based on the paper:
+//! *Round-Based Public Transit Routing* by Daniel Delling, Thomas Pajor, and Renato F. Werneck.
+
 use std::borrow::Cow;
 use std::collections::{BTreeMap, BTreeSet};
 use std::fmt::Debug;
 
+/// GTFS-based [`Timetable`] implementation.
 pub mod gtfs;
 
 #[cfg(test)]
 mod test;
 
+/// The number of transfers (round number in the RAPTOR algorithm).
 pub type K = usize;
+
+/// Time value in seconds since midnight.
 pub type Tau = usize;
 
+/// A journey found by the RAPTOR algorithm.
+///
+/// Each journey consists of a sequence of legs (route, arrival stop) and a final arrival time.
+/// Multiple journeys may be returned for a single query, representing pareto-optimal trade-offs
+/// between fewer transfers and earlier arrival.
 #[derive(Debug, Clone)]
 pub struct Journey<Route, Stop> {
+    /// Sequence of legs, each a (route, arrival stop) pair.
+    ///
+    /// The first leg boards at the source stop. Each subsequent leg boards at the
+    /// arrival stop of the previous leg.
     pub plan: Vec<(Route, Stop)>,
+    /// Arrival time at the target stop, in seconds since midnight.
     pub arrival: Tau,
 }
 
@@ -67,36 +103,66 @@ where
     plans
 }
 
-/// Raptor works on a structure called Timetable, which models a route based networks like a metro system's timetable
+/// Models a route-based transit network for the RAPTOR algorithm.
+///
+/// Implement this trait to describe your transit network's topology and schedule.
+/// The algorithm itself is provided as a default method ([`Timetable::raptor`]).
 pub trait Timetable {
+    /// Identifier for a transit stop.
     type Stop: Ord + Copy + Debug;
+    /// Identifier for a transit route.
     type Route: Ord + Copy + Debug;
+    /// Identifier for a specific trip (a single run of a route).
     type Trip: Copy + Debug;
 
-    // TODO: replace vec with cow or iter
+    /// Returns all routes that serve the given stop.
     fn get_routes_serving_stop(&self, stop: Self::Stop) -> Cow<'_, [Self::Route]>;
+
+    /// Given two stops on a route, returns whichever appears earlier in the route's sequence.
     fn get_earlier_stop(
         &self,
         route: Self::Route,
         left: Self::Stop,
         right: Self::Stop,
     ) -> Self::Stop;
-    // TODO: replace vec with cow or iter
+
+    /// Returns all stops on a route from the given stop onwards (inclusive), in sequence order.
     fn get_stops_after(&self, route: Self::Route, stop: Self::Stop) -> Cow<'_, [Self::Stop]>;
+
+    /// Finds the earliest trip on a route departing at or after `at` from `stop`.
+    ///
+    /// Returns `None` if no such trip exists.
     fn get_earliest_trip(
         &self,
         route: Self::Route,
         at: Tau,
         stop: Self::Stop,
     ) -> Option<Self::Trip>;
+
+    /// Returns the arrival time of a trip at a stop.
     fn get_arrival_time(&self, trip: Self::Trip, stop: Self::Stop) -> Tau;
+
+    /// Returns the departure time of a trip at a stop.
     fn get_departure_time(&self, trip: Self::Trip, stop: Self::Stop) -> Tau;
+
+    /// Returns all stops reachable from the given stop via walking (footpaths).
     fn get_footpaths_from(&self, stop: Self::Stop) -> Cow<'_, [Self::Stop]>;
+
+    /// Returns the walking transfer time between two stops, in seconds.
+    ///
+    /// The default implementation returns `1`. Override this for realistic transfer times.
     fn get_transfer_time(&self, from: Self::Stop, to: Self::Stop) -> Tau {
         let (_, _) = (from, to);
         1
     }
 
+    /// Runs the RAPTOR algorithm and returns all pareto-optimal journeys.
+    ///
+    /// Finds journeys from `ps` (source) to `pt` (target) departing at or after `tau`,
+    /// using at most `transfers` legs. Returns a set of pareto-optimal journeys trading
+    /// off between fewer transfers and earlier arrival.
+    ///
+    /// Returns an empty `Vec` if no journey exists.
     fn raptor(
         &self,
         transfers: usize,
