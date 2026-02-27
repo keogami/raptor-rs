@@ -7,6 +7,7 @@ use crate::Timetable;
 
 const TYPICAL_ROUTES_PER_STOP: usize = 8;
 const TYPICAL_STOPS_PER_ROUTE: usize = 32;
+const DEFAULT_TRANSFER_TIME_SECONDS: usize = 300;
 
 type RoutesForStops<'gtfs> = BTreeMap<&'gtfs str, SmallVec<[&'gtfs str; TYPICAL_ROUTES_PER_STOP]>>;
 type StopForRoutes<'gtfs> = BTreeMap<&'gtfs str, SmallVec<[&'gtfs str; TYPICAL_STOPS_PER_ROUTE]>>;
@@ -105,8 +106,8 @@ impl<'a> GtfsTimetable<'a> {
                     .expect("validated during construction");
                 trip.stop_times
                     .first()
-                    .and_then(|st| st.departure_time)
-                    .unwrap_or(u32::MAX)
+                    .expect("validated at construction")
+                    .departure_time
             });
         }
 
@@ -239,6 +240,6 @@ impl<'gtfs> Timetable for GtfsTimetable<'gtfs> {
             .find(|t| t.to_stop_id == to)
             .and_then(|t| t.min_transfer_time)
             .map(|t| t as crate::Tau)
-            .unwrap_or(300) // default 5 minutes
+            .unwrap_or(DEFAULT_TRANSFER_TIME_SECONDS)
     }
 }
