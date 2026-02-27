@@ -1,3 +1,4 @@
+use std::borrow::Cow;
 use std::collections::{BTreeMap, BTreeSet};
 use std::fmt::Debug;
 
@@ -73,7 +74,7 @@ pub trait Timetable {
     type Trip: Copy + Debug;
 
     // TODO: replace vec with cow or iter
-    fn get_routes_serving_stop(&self, stop: Self::Stop) -> Vec<Self::Route>;
+    fn get_routes_serving_stop(&self, stop: Self::Stop) -> Cow<'_, [Self::Route]>;
     fn get_earlier_stop(
         &self,
         route: Self::Route,
@@ -81,7 +82,7 @@ pub trait Timetable {
         right: Self::Stop,
     ) -> Self::Stop;
     // TODO: replace vec with cow or iter
-    fn get_stops_after(&self, route: Self::Route, stop: Self::Stop) -> Vec<Self::Stop>;
+    fn get_stops_after(&self, route: Self::Route, stop: Self::Stop) -> Cow<'_, [Self::Stop]>;
     fn get_earliest_trip(
         &self,
         route: Self::Route,
@@ -121,7 +122,7 @@ pub trait Timetable {
             Q.clear();
             // find all routes that serve the marked stops, for evaluation in this round
             for &marked_stop in &marked_stops {
-                for route in self.get_routes_serving_stop(marked_stop) {
+                for &route in self.get_routes_serving_stop(marked_stop).iter() {
                     let p_dash = Q.entry(route).or_insert(marked_stop);
 
                     *p_dash = self.get_earlier_stop(route, marked_stop, *p_dash);
@@ -135,7 +136,7 @@ pub trait Timetable {
                 let mut current_trip: Option<Self::Trip> = None;
                 let mut boarding_stop = p;
 
-                for pi in self.get_stops_after(route, p) {
+                for &pi in self.get_stops_after(route, p).iter() {
                     if let Some(arr) = current_trip.map(|trip| self.get_arrival_time(trip, pi)) {
                         let best_arrival_to_target = best_arrival.get(&pt).unwrap_or(&Tau::MAX);
                         let best_arrival_to_pi = best_arrival.get(&pi).unwrap_or(&Tau::MAX);

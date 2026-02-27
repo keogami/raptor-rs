@@ -1,4 +1,4 @@
-use std::collections::BTreeMap;
+use std::{borrow::Cow, collections::BTreeMap};
 
 use gtfs_structures::Gtfs;
 use smallvec::SmallVec;
@@ -128,10 +128,10 @@ impl<'gtfs> Timetable for GtfsTimetable<'gtfs> {
     type Route = &'gtfs str;
     type Trip = &'gtfs str;
 
-    fn get_routes_serving_stop(&self, stop: Self::Stop) -> Vec<Self::Route> {
+    fn get_routes_serving_stop(&self, stop: Self::Stop) -> Cow<'_, [&'gtfs str]> {
         self.routes_for_stops
             .get(&stop)
-            .map(|sv| sv.to_vec())
+            .map(|sv| Cow::Borrowed(sv.as_slice()))
             .unwrap_or_default()
     }
 
@@ -156,7 +156,7 @@ impl<'gtfs> Timetable for GtfsTimetable<'gtfs> {
         }
     }
 
-    fn get_stops_after(&self, route: Self::Route, stop: Self::Stop) -> Vec<Self::Stop> {
+    fn get_stops_after(&self, route: Self::Route, stop: Self::Stop) -> Cow<'_, [&'gtfs str]> {
         let stops = self
             .stops_for_routes
             .get(&route)
@@ -167,7 +167,7 @@ impl<'gtfs> Timetable for GtfsTimetable<'gtfs> {
             .position(|&s| s == stop)
             .expect("stop should exist on route");
 
-        stops[pos..].to_vec()
+        Cow::Borrowed(&stops[pos..])
     }
 
     fn get_earliest_trip(

@@ -1,6 +1,8 @@
 //! Example showing a multi-route RAPTOR query where a passenger reboards
 //! a shared route at a later stop reached via a faster feeder route.
 
+use std::borrow::Cow;
+
 use raptor::{Tau, Timetable};
 
 /// Three routes:
@@ -14,14 +16,16 @@ impl Timetable for ReBoardingTimetable {
     type Route = &'static str;
     type Trip = u32;
 
-    fn get_routes_serving_stop(&self, stop: Self::Stop) -> Vec<Self::Route> {
-        match stop {
+    fn get_routes_serving_stop(&self, stop: Self::Stop) -> Cow<'static, [Self::Route]> {
+        let ret = match stop {
             'S' => vec!["R1", "R2"],
             'A' => vec!["R1", "R3"],
             'B' => vec!["R2", "R3"],
             'C' | 'D' => vec!["R3"],
             _ => vec![],
-        }
+        };
+
+        ret.into()
     }
 
     fn get_earlier_stop(
@@ -41,15 +45,15 @@ impl Timetable for ReBoardingTimetable {
         order[l.min(r)]
     }
 
-    fn get_stops_after(&self, route: Self::Route, stop: Self::Stop) -> Vec<Self::Stop> {
+    fn get_stops_after(&self, route: Self::Route, stop: Self::Stop) -> Cow<'static, [Self::Stop]> {
         let order: &[char] = match route {
             "R1" => &['S', 'A'],
             "R2" => &['S', 'B'],
             "R3" => &['A', 'B', 'C', 'D'],
-            _ => return vec![],
+            _ => return Default::default(),
         };
         let pos = order.iter().position(|&c| c == stop).unwrap_or(0);
-        order[pos..].to_vec()
+        order[pos..].into()
     }
 
     fn get_earliest_trip(

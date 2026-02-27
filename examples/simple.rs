@@ -1,3 +1,5 @@
+use std::borrow::Cow;
+
 use raptor::{Tau, Timetable};
 
 // a single route with stops [0..10]
@@ -10,8 +12,8 @@ impl Timetable for SingleRoute {
 
     type Trip = usize;
 
-    fn get_routes_serving_stop(&self, _stop: Self::Stop) -> Vec<Self::Route> {
-        vec![0]
+    fn get_routes_serving_stop(&self, _stop: Self::Stop) -> Cow<'static, [Self::Route]> {
+        [0].as_ref().into()
     }
 
     fn get_earlier_stop(
@@ -23,11 +25,8 @@ impl Timetable for SingleRoute {
         left.min(right)
     }
 
-    fn get_stops_after(&self, _route: Self::Route, stop: Self::Stop) -> Vec<Self::Stop> {
-        if stop == 9 {
-            return vec![];
-        }
-        (stop..10).collect()
+    fn get_stops_after(&self, _route: Self::Route, stop: Self::Stop) -> Cow<'static, [Self::Stop]> {
+        [0, 1, 2, 3, 4, 5, 6, 7, 8, 9][stop..].into()
     }
 
     fn get_arrival_time(&self, _trip: Self::Trip, stop: Self::Stop) -> Tau {
