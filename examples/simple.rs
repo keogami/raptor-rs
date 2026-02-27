@@ -13,7 +13,7 @@ impl Timetable for SingleRoute {
     type Trip = usize;
 
     fn get_routes_serving_stop(&self, _stop: Self::Stop) -> Cow<'static, [Self::Route]> {
-        [0].as_ref().into()
+        (&[0]).into()
     }
 
     fn get_earlier_stop(
@@ -38,7 +38,7 @@ impl Timetable for SingleRoute {
     }
 
     fn get_footpaths_from(&self, _stop: Self::Stop) -> Cow<'static, [Self::Stop]> {
-        [].as_slice().into()
+        (&[]).into()
     }
 
     fn get_earliest_trip(

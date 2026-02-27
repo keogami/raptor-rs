@@ -83,9 +83,9 @@ impl Timetable for TwoRoutes {
 
     fn get_footpaths_from(&self, stop: Self::Stop) -> Cow<'static, [Self::Stop]> {
         if stop == 2 {
-            [2].as_slice().into()
+            (&[2]).into()
         } else {
-            [].as_slice().into()
+            (&[]).into()
         }
     }
 }

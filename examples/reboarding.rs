@@ -50,7 +50,7 @@ impl Timetable for ReBoardingTimetable {
             "R1" => &['S', 'A'],
             "R2" => &['S', 'B'],
             "R3" => &['A', 'B', 'C', 'D'],
-            _ => return Default::default(),
+            _ => return (&[]).into(),
         };
         let pos = order.iter().position(|&c| c == stop).unwrap_or(0);
         order[pos..].into()
@@ -128,7 +128,7 @@ impl Timetable for ReBoardingTimetable {
     }
 
     fn get_footpaths_from(&self, _: Self::Stop) -> Cow<'static, [Self::Stop]> {
-        [].as_slice().into()
+        (&[]).into()
     }
 }
 
