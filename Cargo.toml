@@ -13,8 +13,13 @@ path = "src/lib.rs"
 
 [dev-dependencies]
 anyhow = "1.0.100"
+criterion = { version = "0.5", features = ["html_reports"] }
 env_logger = "0.11"
 humantime = "2"
+
+[[bench]]
+name = "raptor"
+harness = false
 
 [profile.dev]
 debug = "full"

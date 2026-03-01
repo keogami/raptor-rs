@@ -3,6 +3,7 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::fmt::Debug;
 
 pub mod gtfs;
+pub mod simple;
 
 #[cfg(test)]
 mod test;
