@@ -1,13 +1,10 @@
 name: Benchmarks
 
 on:
-  push:
-    branches: [main]
   pull_request:
     branches: [main]
 
 permissions:
-  contents: write
   pull-requests: write
 
 jobs:
@@ -16,6 +13,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: main
 
       - uses: dtolnay/rust-toolchain@stable
 
@@ -27,17 +26,25 @@ jobs:
             target
           key: ${{ runner.os }}-bench-${{ hashFiles('**/Cargo.lock') }}
 
-      - name: Run benchmarks
-        run: cargo bench -p raptor --features internal --bench raptor -- --output-format bencher 2>/dev/null | tee output.txt
+      - name: Benchmark main (baseline)
+        run: cargo bench -p raptor --features internal --bench raptor -- --save-baseline main
 
-      - name: Store benchmark result
-        uses: benchmark-action/github-action-benchmark@v1
+      - uses: actions/checkout@v4
         with:
-          tool: cargo
-          output-file-path: output.txt
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          alert-threshold: "120%"
-          comment-on-alert: true
-          fail-on-alert: false
-          auto-push: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
-          comment-always: ${{ github.event_name == 'pull_request' }}
+          clean: false
+
+      - name: Benchmark PR vs main
+        run: cargo bench -p raptor --features internal --bench raptor -- --baseline main 2> bench-output.txt
+
+      - name: Post benchmark comment
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          BODY="## Benchmark results
+
+          \`\`\`
+          $(cat bench-output.txt)
+          \`\`\`"
+
+          gh pr comment ${{ github.event.number }} --body "$BODY" --edit-last || \
+          gh pr comment ${{ github.event.number }} --body "$BODY"
