@@ -69,6 +69,17 @@ where
     }
 }
 
+impl<S, R, T> Default for SimpleTimetable<S, R, T>
+where
+    S: Ord + Copy,
+    R: Ord + Copy,
+    T: Ord + Copy,
+{
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl<S, R, T> From<(&[(R, &[S], &[(T, &[(Tau, Tau)])])], &[(S, S)])> for SimpleTimetable<S, R, T>
 where
     S: Ord + Copy,
