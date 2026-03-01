@@ -1,3 +1,4 @@
+/// Benchmark timetable builders.
 #[cfg(feature = "internal")]
 pub mod builders;
 
@@ -7,6 +8,7 @@ use std::fmt::Debug;
 
 use crate::{Tau, Timetable};
 
+/// A generic in-memory timetable backed by `BTreeMap`s.
 pub struct SimpleTimetable<S, R, T> {
     /// route_id -> ordered stop sequence
     routes: BTreeMap<R, Vec<S>>,
@@ -24,6 +26,7 @@ where
     R: Ord + Copy,
     T: Ord + Copy,
 {
+    /// Creates an empty timetable.
     pub fn new() -> Self {
         Self {
             routes: BTreeMap::new(),
@@ -33,6 +36,7 @@ where
         }
     }
 
+    /// Adds a route with its stops and trips.
     pub fn route(mut self, id: R, stops: &[S], trips: &[(T, &[(Tau, Tau)])]) -> Self
     where
         R: Debug,
@@ -52,11 +56,13 @@ where
         self
     }
 
+    /// Adds a footpath from one stop to another.
     pub fn footpath(mut self, from: S, to: S) -> Self {
         self.footpaths.entry(from).or_default().push(to);
         self
     }
 
+    /// Sets the transfer time for a footpath.
     pub fn transfer_time(mut self, from: S, to: S, time: Tau) -> Self {
         self.transfer_times.insert((from, to), time);
         self
@@ -179,6 +185,7 @@ where
     R: Ord + Copy + Debug,
     T: Ord + Copy + Debug,
 {
+    /// Renders the timetable as a Graphviz DOT string.
     pub fn to_dot(&self, name: &str) -> Result<String, std::io::Error> {
         use dot_graph::{Edge, Graph, Kind, Node, Style};
         use std::collections::BTreeSet;

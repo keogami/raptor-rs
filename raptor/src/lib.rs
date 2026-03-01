@@ -25,6 +25,7 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::fmt::Debug;
 
 pub mod gtfs;
+/// In-memory timetable for testing and simple use cases.
 pub mod simple;
 
 #[cfg(test)]
