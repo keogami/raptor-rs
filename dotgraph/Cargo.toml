@@ -1,0 +1,8 @@
+[package]
+name = "raptor-dotgraph"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+clap = { version = "4", features = ["derive"] }
+raptor = { version = "0.1.1", path = "../raptor", features = ["dotgraph", "internal"] }

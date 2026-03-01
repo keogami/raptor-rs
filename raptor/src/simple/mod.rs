@@ -1,3 +1,6 @@
+#[cfg(feature = "internal")]
+pub mod builders;
+
 use std::borrow::Cow;
 use std::collections::BTreeMap;
 use std::fmt::Debug;
@@ -166,5 +169,76 @@ where
 
     fn get_transfer_time(&self, from: Self::Stop, to: Self::Stop) -> Tau {
         self.transfer_times.get(&(from, to)).copied().unwrap_or(1)
+    }
+}
+
+#[cfg(feature = "dotgraph")]
+impl<S, R, T> SimpleTimetable<S, R, T>
+where
+    S: Ord + Copy + Debug + std::fmt::Display,
+    R: Ord + Copy + Debug,
+    T: Ord + Copy + Debug,
+{
+    pub fn to_dot(&self, name: &str) -> Result<String, std::io::Error> {
+        use dot_graph::{Edge, Graph, Kind, Node, Style};
+        use std::collections::BTreeSet;
+
+        let mut graph = Graph::new(name, Kind::Digraph);
+
+        // Collect all unique stops
+        let mut stops = BTreeSet::<S>::new();
+        for s in self.routes.values() {
+            stops.extend(s);
+        }
+
+        for &stop in &stops {
+            graph.add_node(Node::new(&format!("s{stop}")));
+        }
+
+        // Deterministic color palette for routes
+        const COLORS: &[&str] = &[
+            "red", "blue", "green", "orange", "purple", "brown", "deeppink", "darkgreen",
+            "navy", "goldenrod",
+        ];
+
+        // Route edges, colored per route, with trip timings
+        for (idx, (route_id, route_stops)) in self.routes.iter().enumerate() {
+            let color = COLORS[idx % COLORS.len()];
+            // Collect trips belonging to this route
+            let route_trips: Vec<_> = self
+                .trips
+                .iter()
+                .filter(|(_, (r, _))| r == route_id)
+                .collect();
+
+            for (i, window) in route_stops.windows(2).enumerate() {
+                let from = window[0];
+                let to = window[1];
+                let mut label = format!("R{route_id:?}");
+                for (trip_id, (_, times)) in &route_trips {
+                    let dep = times[i].1;
+                    let arr = times[i + 1].0;
+                    label.push_str(&format!("\\nT{trip_id:?}: {dep}\u{2192}{arr}"));
+                }
+                graph.add_edge(
+                    Edge::new(&format!("s{from}"), &format!("s{to}"), &label)
+                        .color(Some(color)),
+                );
+            }
+        }
+
+        // Footpath edges (dashed)
+        for (&from, targets) in &self.footpaths {
+            for &to in targets {
+                let time = self.transfer_times.get(&(from, to)).copied().unwrap_or(1);
+                graph.add_edge(
+                    Edge::new(&format!("s{from}"), &format!("s{to}"), &format!("t={time}"))
+                        .style(Style::Dashed)
+                        .color(Some("gray")),
+                );
+            }
+        }
+
+        graph.to_dot_string()
     }
 }
