@@ -16,24 +16,5 @@ fn bench_gtfs_load(c: &mut Criterion) {
     });
 }
 
-fn bench_gtfs_all_pairs(c: &mut Criterion) {
-    let gtfs = Gtfs::new(GTFS_PATH).unwrap();
-    let timetable = GtfsTimetable::new(&gtfs).unwrap();
-    let stops: Vec<&str> = gtfs.stops.keys().map(|s| s.as_str()).collect();
-
-    c.bench_function("gtfs_all_pairs", |b| {
-        b.iter(|| {
-            for &source in &stops {
-                for &target in &stops {
-                    if source == target {
-                        continue;
-                    }
-                    black_box(timetable.raptor(10, 0, source, target));
-                }
-            }
-        });
-    });
-}
-
-criterion_group!(gtfs_benches, bench_gtfs_load, bench_gtfs_all_pairs);
+criterion_group!(gtfs_benches, bench_gtfs_load);
 criterion_main!(gtfs_benches);
