@@ -18,7 +18,7 @@ gtfs-bench = []
 
 [dev-dependencies]
 anyhow = "1.0.100"
-criterion = { version = "0.5", features = ["html_reports"] }
+criterion = { version = "0.5", features = ["html_reports", "csv_output"] }
 env_logger = "0.11"
 humantime = "2"
 

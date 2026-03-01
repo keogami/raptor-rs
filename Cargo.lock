@@ -311,6 +311,7 @@ dependencies = [
  "ciborium",
  "clap",
  "criterion-plot",
+ "csv",
  "is-terminal",
  "itertools 0.10.5",
  "num-traits",

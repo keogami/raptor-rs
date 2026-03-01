@@ -15,39 +15,39 @@ struct Cli {
 enum Command {
     /// Single route with N stops and M trips
     Linear {
-        #[arg(long)]
+        #[arg(long, short)]
         stops: usize,
-        #[arg(long)]
+        #[arg(long, short)]
         trips: usize,
     },
     /// Grid of horizontal routes with vertical connectors
     Grid {
-        #[arg(long)]
+        #[arg(long, short)]
         routes: usize,
-        #[arg(long)]
+        #[arg(long, short = 'c')]
         stops_per_route: usize,
         #[arg(long)]
         connectors: usize,
     },
     /// Hub-and-spoke network with footpath-connected hubs
     HubSpoke {
-        #[arg(long)]
+        #[arg(long, short)]
         hubs: usize,
-        #[arg(long)]
+        #[arg(long, short = 'r')]
         routes_per_hub: usize,
-        #[arg(long)]
-        spokes: usize,
+        #[arg(long, short = 's')]
+        stops_per_spoke: usize,
     },
     /// Chain of single-leg routes forcing transfers
     Chain {
-        #[arg(long)]
+        #[arg(long, short)]
         segments: usize,
     },
     /// Parallel paths from source to target with varying legs
     ParallelPaths {
-        #[arg(long)]
+        #[arg(long, short = 'p')]
         path_count: usize,
-        #[arg(long)]
+        #[arg(long, short = 'm')]
         max_legs: usize,
     },
 }
@@ -70,9 +70,9 @@ fn main() {
         Command::HubSpoke {
             hubs,
             routes_per_hub,
-            spokes,
+            stops_per_spoke: stop_per_spoke,
         } => (
-            builders::build_hub_spoke(hubs, routes_per_hub, spokes),
+            builders::build_hub_spoke(hubs, routes_per_hub, stop_per_spoke),
             "hub_spoke".to_string(),
         ),
         Command::Chain { segments } => (builders::build_chain(segments), "chain".to_string()),

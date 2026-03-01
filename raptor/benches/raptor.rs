@@ -22,12 +22,15 @@ fn bench_linear(c: &mut Criterion) {
 /// connectors, testing how the algorithm handles scanning many routes per round. (explained by llm)
 fn bench_grid(c: &mut Criterion) {
     let mut group = c.benchmark_group("grid");
-    for &(routes, spr, connectors) in &[(3, 10, 2), (5, 20, 4), (10, 30, 6)] {
-        let tt = build_grid(routes, spr, connectors);
+    for &(routes, stops_per_route, connectors) in &[(3, 10, 2), (5, 20, 4), (10, 30, 6)] {
+        let tt = build_grid(routes, stops_per_route, connectors);
         let source = 0;
-        let target = (routes - 1) * spr + spr - 1;
+        let target = (routes - 1) * stops_per_route + stops_per_route - 1;
         group.bench_with_input(
-            BenchmarkId::new("raptor", format!("{routes}r_{spr}s_{connectors}c")),
+            BenchmarkId::new(
+                "raptor",
+                format!("{routes}r_{stops_per_route}s_{connectors}c"),
+            ),
             &tt,
             |b, tt| b.iter(|| tt.raptor(5, 0, source, target)),
         );
@@ -40,15 +43,16 @@ fn bench_grid(c: &mut Criterion) {
 /// handling and route selection in dense, hub-centered networks. (explained by llm)
 fn bench_hub_spoke(c: &mut Criterion) {
     let mut group = c.benchmark_group("hub_spoke");
-    for &(hubs, rph, spokes) in &[(1, 10, 10), (3, 10, 10), (3, 20, 15)] {
-        let tt = build_hub_spoke(hubs, rph, spokes);
+    for &(hubs, routes_per_hub, spokes) in &[(1, 10, 10), (3, 10, 10), (3, 20, 15)] {
+        let tt = build_hub_spoke(hubs, routes_per_hub, spokes);
         // Route from first spoke of first hub to last spoke of last hub
         let source = hubs; // first non-hub stop
         let last_hub_first_route_last_spoke =
-            hubs + (hubs - 1) * rph * spokes + (rph - 1) * spokes + spokes - 1;
-        let target = last_hub_first_route_last_spoke.min(hubs + hubs * rph * spokes - 1);
+            hubs + (hubs - 1) * routes_per_hub * spokes + (routes_per_hub - 1) * spokes + spokes
+                - 1;
+        let target = last_hub_first_route_last_spoke.min(hubs + hubs * routes_per_hub * spokes - 1);
         group.bench_with_input(
-            BenchmarkId::new("raptor", format!("{hubs}h_{rph}r_{spokes}sp")),
+            BenchmarkId::new("raptor", format!("{hubs}h_{routes_per_hub}r_{spokes}sp")),
             &tt,
             |b, tt| b.iter(|| tt.raptor(5, 0, source, target)),
         );
