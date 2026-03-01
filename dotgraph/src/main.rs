@@ -2,7 +2,10 @@ use clap::{Parser, Subcommand};
 use raptor::simple::builders;
 
 #[derive(Parser)]
-#[command(name = "raptor-dotgraph", about = "Generate DOT graphs of synthetic transit networks")]
+#[command(
+    name = "raptor-dotgraph",
+    about = "Generate DOT graphs of synthetic transit networks"
+)]
 struct Cli {
     #[command(subcommand)]
     command: Command,
@@ -72,9 +75,7 @@ fn main() {
             builders::build_hub_spoke(hubs, routes_per_hub, spokes),
             "hub_spoke".to_string(),
         ),
-        Command::Chain { segments } => {
-            (builders::build_chain(segments), "chain".to_string())
-        }
+        Command::Chain { segments } => (builders::build_chain(segments), "chain".to_string()),
         Command::ParallelPaths {
             path_count,
             max_legs,

@@ -197,8 +197,16 @@ where
 
         // Deterministic color palette for routes
         const COLORS: &[&str] = &[
-            "red", "blue", "green", "orange", "purple", "brown", "deeppink", "darkgreen",
-            "navy", "goldenrod",
+            "red",
+            "blue",
+            "green",
+            "orange",
+            "purple",
+            "brown",
+            "deeppink",
+            "darkgreen",
+            "navy",
+            "goldenrod",
         ];
 
         // Route edges, colored per route, with trip timings
@@ -221,8 +229,7 @@ where
                     label.push_str(&format!("\\nT{trip_id:?}: {dep}\u{2192}{arr}"));
                 }
                 graph.add_edge(
-                    Edge::new(&format!("s{from}"), &format!("s{to}"), &label)
-                        .color(Some(color)),
+                    Edge::new(&format!("s{from}"), &format!("s{to}"), &label).color(Some(color)),
                 );
             }
         }

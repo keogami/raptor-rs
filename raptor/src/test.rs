@@ -1,5 +1,5 @@
-use crate::simple::SimpleTimetable;
 use crate::Timetable;
+use crate::simple::SimpleTimetable;
 
 /// When a faster route reaches a mid-route stop, the algorithm must record
 /// that stop as the boarding stop — not the earlier stop where the route
