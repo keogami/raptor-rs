@@ -1,0 +1,39 @@
+[package]
+name = "raptor"
+version = "0.1.1"
+edition = "2024"
+authors = ["keogami <https://github.com/keogami>"]
+description = "Rust impl of RAPTOR (Round-bAsed Public Transit Routing)"
+license = "Apache-2.0"
+repository = "https://github.com/keogami/raptor-rs"
+
+[lib]
+name = "raptor"
+path = "src/lib.rs"
+
+[features]
+internal = []
+dotgraph = ["dep:dot_graph"]
+gtfs-bench = []
+
+[dev-dependencies]
+anyhow = "1.0.100"
+criterion = { version = "0.5", features = ["html_reports", "csv_output"] }
+env_logger = "0.11"
+humantime = "2"
+
+[[bench]]
+name = "raptor"
+harness = false
+
+[[bench]]
+name = "gtfs"
+harness = false
+required-features = ["gtfs-bench"]
+
+[dependencies]
+dot_graph = { version = "0.2", optional = true }
+gtfs-structures = "0.46.1"
+log = "0.4.29"
+smallvec = "1.15.1"
+thiserror = "2.0.18"
