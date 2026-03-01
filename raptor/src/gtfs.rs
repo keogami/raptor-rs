@@ -1,3 +1,8 @@
+//! [`Timetable`] implementation backed by a GTFS feed.
+//!
+//! Wraps a parsed [`Gtfs`] object and pre-computes lookup indices
+//! for efficient route, stop, and trip queries.
+
 use std::{borrow::Cow, collections::BTreeMap};
 
 use gtfs_structures::Gtfs;
@@ -16,18 +21,26 @@ type TripsForRoutes<'gtfs> = BTreeMap<&'gtfs str, Vec<&'gtfs str>>;
 type FootpathsForStops<'gtfs> =
     BTreeMap<&'gtfs str, SmallVec<[&'gtfs str; TYPICAL_TRANSFERS_PER_STOP]>>;
 
+/// Errors that can occur when constructing a [`GtfsTimetable`].
 #[derive(thiserror::Error, Debug)]
 pub enum GtfsError {
+    /// A trip referenced in the feed was not found.
     #[error("trip not found: {0}")]
     MissingTrip(String),
+    /// A stop referenced by a trip was not found.
     #[error("stop not found: {0}")]
     MissingStop(String),
+    /// A trip has no stop times defined.
     #[error("trip has no stop_times: {0}")]
     MissingStopTimes(String),
 }
 
 type GtfsResult<T> = std::result::Result<T, GtfsError>;
 
+/// A [`Timetable`] implementation that wraps a parsed GTFS feed.
+///
+/// Constructed via [`GtfsTimetable::new`], which validates the feed and builds
+/// internal lookup indices for routes, stops, trips, and footpaths.
 pub struct GtfsTimetable<'gtfs> {
     gtfs: &'gtfs Gtfs,
 
@@ -39,6 +52,9 @@ pub struct GtfsTimetable<'gtfs> {
 }
 
 impl<'a> GtfsTimetable<'a> {
+    /// Creates a new timetable from a parsed GTFS feed.
+    ///
+    /// Returns an error if the feed contains trips with missing stops or empty stop times.
     pub fn new(gtfs: &'a Gtfs) -> GtfsResult<Self> {
         let routes_for_stops = Self::cache_routes_for_stops(gtfs)?;
         let stops_for_routes = Self::cache_stops_for_routes(gtfs)?;
