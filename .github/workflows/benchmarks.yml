@@ -34,7 +34,7 @@ jobs:
           clean: false
 
       - name: Benchmark PR vs main
-        run: cargo bench -p raptor --features internal --bench raptor -- --baseline main 2> bench-output.txt
+        run: cargo bench -p raptor --features internal --bench raptor -- --baseline main | tee bench-output.txt
 
       - name: Post benchmark comment
         env:
