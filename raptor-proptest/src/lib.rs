@@ -100,15 +100,33 @@ fn layer3_matches_reference(tc: hegel::TestCase) {
     run_property(&tc, &spec);
 }
 
-/// `Query::run_par()` (parallel range query) must produce byte-identical
-/// output to the serial `.run()` for any generated spec. Catches: pool
-/// checkout/return races, per-departure state leakage between cache reuses,
-/// and any non-determinism leaking out of Rayon's `collect`. Uses
-/// `layer1_bounds` to keep the per-case cost low — algorithm correctness
-/// is already covered by the layer1/2/3 reference comparisons; this
-/// property is parallel-vs-serial parity, which doesn't need large specs.
+/// Cross-check the two range-query implementations: the serial path runs
+/// rRAPTOR (single reverse-chronological scan reusing labels across
+/// departures, paper §4); the parallel paths fan a naïve per-departure
+/// batch across Rayon. Output must be identical.
+///
+/// This property covers two distinct concerns simultaneously:
+///
+/// 1. **rRAPTOR-vs-naïve-batch equivalence.** The serial range path is
+///    rRAPTOR; the parallel paths run the naïve batch. Treating the naïve
+///    batch as the reference, this asserts rRAPTOR's label-inheritance,
+///    newly-active-stops marking, and per-τ snapshotting all preserve the
+///    per-departure semantics. Catches algorithm-specialisation bugs
+///    (state leak across τ scans, missed re-marking, dominated-label
+///    races against `best_arrival`).
+///
+/// 2. **Parallel-vs-serial parity.** Both `.run_par()` and
+///    `.run_with_pool()` must produce identical output to `.run()`.
+///    Catches pool checkout/return races, per-departure state leakage
+///    between cache reuses, and any non-determinism leaking out of
+///    Rayon's `collect`.
+///
+/// Uses `layer1_bounds` to keep the per-case cost low — single-departure
+/// algorithm correctness is already covered by `layer{1,2,3}_matches_reference`;
+/// this is the only test exercising the range-query path, so it must
+/// stay fast enough to run on every commit.
 #[hegel::test]
-fn parallel_range_matches_serial(tc: hegel::TestCase) {
+fn parallel_naive_matches_serial_rrap(tc: hegel::TestCase) {
     use raptor::RaptorCachePool;
 
     let spec = tc.draw(spec::network_spec(spec::layer1_bounds()));
@@ -164,8 +182,8 @@ fn parallel_range_matches_serial(tc: hegel::TestCase) {
         assert_eq!(s.depart, pool_entry.depart);
         assert_eq!(s.journey.arrival(), p.journey.arrival());
         assert_eq!(s.journey.arrival(), pool_entry.journey.arrival());
-        assert_eq!(s.journey.plan.len(), p.journey.plan.len());
-        assert_eq!(s.journey.plan.len(), pool_entry.journey.plan.len());
+        assert_eq!(s.journey.plan, p.journey.plan);
+        assert_eq!(s.journey.plan, pool_entry.journey.plan);
     }
 }
 
