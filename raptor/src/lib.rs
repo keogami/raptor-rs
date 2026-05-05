@@ -1198,6 +1198,225 @@ fn extract_target_journeys<L: Label>(
     journeys
 }
 
+/// Run round-0 footpath relaxation followed by rounds `1..=transfers`
+/// against an already-seeded cache. Caller is responsible for setting
+/// up `marked_stops`, `labels`, `best_arrival`, `origin_set`, and
+/// `ever_reached` before calling. Shared by the per-call algorithm
+/// (which seeds a single τ) and the rRAPTOR scan (which re-seeds for
+/// each τ in descending order).
+#[allow(clippy::too_many_arguments)]
+fn run_raptor_rounds<T: Timetable + ?Sized, L: Label>(
+    tt: &T,
+    labels: &mut [Vec<LabelBag<L>>],
+    best_arrival: &mut [LabelBag<L>],
+    board_detail: &mut BoardingTree,
+    marked_stops: &mut FixedBitSet,
+    q_entry: &mut [Option<u32>],
+    q_routes: &mut Vec<RouteIdx>,
+    walked_buf: &mut Vec<StopIdx>,
+    relax_heap: &mut BinaryHeap<Reverse<(SecondOfDay, u32)>>,
+    ever_reached: &mut FixedBitSet,
+    transfers: usize,
+    targets: &[(StopIdx, Duration)],
+) {
+    let mut pt_threshold = best_to_any_target(best_arrival, targets);
+
+    // Pick the per-round footpath relaxation strategy once. Closed
+    // graphs use a single-pass O(E) walk; non-closed graphs need
+    // multi-source Dijkstra to chain walks to a fixed point.
+    let footpaths_closed = tt.footpaths_are_transitively_closed();
+
+    if footpaths_closed {
+        relax_footpaths_round_closed(
+            tt,
+            0,
+            labels,
+            best_arrival,
+            board_detail,
+            marked_stops,
+            pt_threshold,
+            walked_buf,
+            ever_reached,
+        );
+    } else {
+        relax_footpaths_round(
+            tt,
+            0,
+            labels,
+            best_arrival,
+            board_detail,
+            marked_stops,
+            pt_threshold,
+            walked_buf,
+            relax_heap,
+            ever_reached,
+        );
+    }
+    for s in walked_buf.drain(..) {
+        marked_stops.insert(s.idx());
+    }
+    pt_threshold = best_to_any_target(best_arrival, targets);
+
+    for k in 1..=transfers {
+        // Sparse carry-forward: only clone bags at stops ever
+        // reached so far this query. For real feeds the reached
+        // set is small (<10% of stops in typical city queries),
+        // so this avoids the 50k-stop dense memcpy that would
+        // otherwise dominate per-round overhead.
+        let (prev_labels, this_labels) = labels.split_at_mut(k);
+        let src = &prev_labels[k - 1];
+        let dst = &mut this_labels[0];
+        for bit in ever_reached.ones() {
+            dst[bit] = src[bit].clone();
+        }
+
+        // Build the route queue for this round. Each entry pairs a
+        // route with the earliest position on that route from which we
+        // can board this round. Stored positions are folded with `min`
+        // so multiple marked stops on the same route resolve to the
+        // earliest one.
+        for stop_bit in marked_stops.ones() {
+            let marked_stop = StopIdx::new(stop_bit as u32);
+            for &(route, pos) in tt.get_routes_serving_stop(marked_stop) {
+                match q_entry[route.idx()] {
+                    None => {
+                        q_entry[route.idx()] = Some(pos);
+                        q_routes.push(route);
+                    }
+                    Some(prev_pos) => {
+                        if pos < prev_pos {
+                            q_entry[route.idx()] = Some(pos);
+                        }
+                    }
+                }
+            }
+        }
+
+        marked_stops.clear();
+
+        // Per-route Pareto bag of riding entries. Each entry =
+        // (boarding_label, current_trip, boarding_stop); a single
+        // entry suffices for `ArrivalTime` (size-1 stop bags) but
+        // multi-criterion impls may carry multiple Pareto-optimal
+        // entries that boarded different trips.
+        let mut route_bag: SmallVec<[(L, TripIdx, StopIdx); 8]> = SmallVec::new();
+        let mut staged: SmallVec<[L; 8]> = SmallVec::new();
+
+        for &route in q_routes.iter() {
+            let p_pos = q_entry[route.idx()].expect("route in q_routes must have an entry");
+            route_bag.clear();
+
+            for (offset, &pi) in tt.get_stops_after(route, p_pos).iter().enumerate() {
+                let pos = p_pos + offset as u32;
+
+                // 1. Alight every active riding entry at pi.
+                for &(boarding_label, trip, boarding_stop) in route_bag.iter() {
+                    let arr = tt.get_arrival_time(trip, pos);
+                    let best_to_pi = best_arrival[pi.idx()].min_arrival();
+                    let time_to_beat = best_to_pi.min(pt_threshold);
+                    if arr >= time_to_beat {
+                        continue;
+                    }
+                    let new_label = boarding_label.extend_by_trip(arr);
+                    if labels[k][pi.idx()].insert(new_label) {
+                        best_arrival[pi.idx()].insert(new_label);
+                        board_detail.insert(
+                            (k, pi, new_label.arrival()),
+                            Step::Boarded {
+                                from: boarding_stop,
+                                route,
+                                parent_arrival: boarding_label.arrival(),
+                            },
+                        );
+                        marked_stops.insert(pi.idx());
+                        ever_reached.insert(pi.idx());
+                    }
+                }
+
+                // 2. Try to extend route_bag with labels from
+                //    labels[k-1][pi] that can catch a trip on this
+                //    route at pi. Snapshot first to avoid aliasing.
+                staged.clear();
+                staged.extend(labels[k - 1][pi.idx()].iter().copied());
+                for candidate in &staged {
+                    let cand_arr = candidate.arrival();
+                    let trip = match tt.get_earliest_trip(route, cand_arr, pos) {
+                        Some(t) => t,
+                        None => continue,
+                    };
+                    let trip_dep = tt.get_departure_time(trip, pos);
+
+                    // Redundancy check: existing route_bag entry
+                    // dominates candidate AND boards an at-or-earlier
+                    // trip at pi → candidate is redundant.
+                    let mut redundant = false;
+                    for &(l_existing, t_existing, _) in route_bag.iter() {
+                        let existing_dep = tt.get_departure_time(t_existing, pos);
+                        if l_existing.dominates(candidate) && existing_dep <= trip_dep {
+                            redundant = true;
+                            break;
+                        }
+                    }
+                    if redundant {
+                        continue;
+                    }
+
+                    // Remove entries strictly dominated by candidate.
+                    route_bag.retain(|&mut (l_existing, t_existing, _)| {
+                        let existing_dep = tt.get_departure_time(t_existing, pos);
+                        !(candidate.dominates(&l_existing) && trip_dep <= existing_dep)
+                    });
+                    route_bag.push((*candidate, trip, pi));
+                }
+            }
+        }
+
+        // Sparse-set reset of the route queue.
+        for r in q_routes.drain(..) {
+            q_entry[r.idx()] = None;
+        }
+
+        // Refresh target threshold after the route scan, then run
+        // footpath relax. Refresh again after the footpath round so
+        // the next round's boarding decisions use a current threshold.
+        pt_threshold = best_to_any_target(best_arrival, targets);
+        if footpaths_closed {
+            relax_footpaths_round_closed(
+                tt,
+                k,
+                labels,
+                best_arrival,
+                board_detail,
+                marked_stops,
+                pt_threshold,
+                walked_buf,
+                ever_reached,
+            );
+        } else {
+            relax_footpaths_round(
+                tt,
+                k,
+                labels,
+                best_arrival,
+                board_detail,
+                marked_stops,
+                pt_threshold,
+                walked_buf,
+                relax_heap,
+                ever_reached,
+            );
+        }
+        for s in walked_buf.drain(..) {
+            marked_stops.insert(s.idx());
+        }
+        pt_threshold = best_to_any_target(best_arrival, targets);
+
+        if marked_stops.is_clear() {
+            break;
+        }
+    }
+}
+
 /// Mark stops where any route through them has a trip whose departure
 /// time at that position falls in `[lo, hi)`. Used by rRAPTOR between
 /// τ scans to find stops that need rescanning because new trips just
@@ -1466,202 +1685,20 @@ pub trait Timetable {
             }
         }
 
-        let mut pt_threshold = best_to_any_target(best_arrival, targets);
-
-        // Pick the per-round footpath relaxation strategy once. Closed
-        // graphs use a single-pass O(E) walk; non-closed graphs need
-        // multi-source Dijkstra to chain walks to a fixed point.
-        let footpaths_closed = self.footpaths_are_transitively_closed();
-
-        if footpaths_closed {
-            relax_footpaths_round_closed(
-                self,
-                0,
-                labels,
-                best_arrival,
-                board_detail,
-                marked_stops,
-                pt_threshold,
-                walked_buf,
-                ever_reached,
-            );
-        } else {
-            relax_footpaths_round(
-                self,
-                0,
-                labels,
-                best_arrival,
-                board_detail,
-                marked_stops,
-                pt_threshold,
-                walked_buf,
-                relax_heap,
-                ever_reached,
-            );
-        }
-        for s in walked_buf.drain(..) {
-            marked_stops.insert(s.idx());
-        }
-        pt_threshold = best_to_any_target(best_arrival, targets);
-
-        for k in 1..=transfers {
-            // Sparse carry-forward: only clone bags at stops ever
-            // reached so far this query. For real feeds the reached
-            // set is small (<10% of stops in typical city queries),
-            // so this avoids the 50k-stop dense memcpy that would
-            // otherwise dominate per-round overhead.
-            let (prev_labels, this_labels) = labels.split_at_mut(k);
-            let src = &prev_labels[k - 1];
-            let dst = &mut this_labels[0];
-            for bit in ever_reached.ones() {
-                dst[bit] = src[bit].clone();
-            }
-
-            // Build the route queue for this round. Each entry pairs a
-            // route with the earliest position on that route from which we
-            // can board this round. Stored positions are folded with `min`
-            // so multiple marked stops on the same route resolve to the
-            // earliest one.
-            for stop_bit in marked_stops.ones() {
-                let marked_stop = StopIdx::new(stop_bit as u32);
-                for &(route, pos) in self.get_routes_serving_stop(marked_stop) {
-                    match q_entry[route.idx()] {
-                        None => {
-                            q_entry[route.idx()] = Some(pos);
-                            q_routes.push(route);
-                        }
-                        Some(prev_pos) => {
-                            if pos < prev_pos {
-                                q_entry[route.idx()] = Some(pos);
-                            }
-                        }
-                    }
-                }
-            }
-
-            marked_stops.clear();
-
-            // Per-route Pareto bag of riding entries. Each entry =
-            // (boarding_label, current_trip, boarding_stop); a single
-            // entry suffices for `ArrivalTime` (size-1 stop bags) but
-            // multi-criterion impls may carry multiple Pareto-optimal
-            // entries that boarded different trips.
-            let mut route_bag: SmallVec<[(L, TripIdx, StopIdx); 8]> = SmallVec::new();
-            let mut staged: SmallVec<[L; 8]> = SmallVec::new();
-
-            for &route in q_routes.iter() {
-                let p_pos = q_entry[route.idx()].expect("route in q_routes must have an entry");
-                route_bag.clear();
-
-                for (offset, &pi) in self.get_stops_after(route, p_pos).iter().enumerate() {
-                    let pos = p_pos + offset as u32;
-
-                    // 1. Alight every active riding entry at pi.
-                    for &(boarding_label, trip, boarding_stop) in route_bag.iter() {
-                        let arr = self.get_arrival_time(trip, pos);
-                        let best_to_pi = best_arrival[pi.idx()].min_arrival();
-                        let time_to_beat = best_to_pi.min(pt_threshold);
-                        if arr >= time_to_beat {
-                            continue;
-                        }
-                        let new_label = boarding_label.extend_by_trip(arr);
-                        if labels[k][pi.idx()].insert(new_label) {
-                            best_arrival[pi.idx()].insert(new_label);
-                            board_detail.insert(
-                                (k, pi, new_label.arrival()),
-                                Step::Boarded {
-                                    from: boarding_stop,
-                                    route,
-                                    parent_arrival: boarding_label.arrival(),
-                                },
-                            );
-                            marked_stops.insert(pi.idx());
-                            ever_reached.insert(pi.idx());
-                        }
-                    }
-
-                    // 2. Try to extend route_bag with labels from
-                    //    labels[k-1][pi] that can catch a trip on this
-                    //    route at pi. Snapshot first to avoid aliasing.
-                    staged.clear();
-                    staged.extend(labels[k - 1][pi.idx()].iter().copied());
-                    for candidate in &staged {
-                        let cand_arr = candidate.arrival();
-                        let trip = match self.get_earliest_trip(route, cand_arr, pos) {
-                            Some(t) => t,
-                            None => continue,
-                        };
-                        let trip_dep = self.get_departure_time(trip, pos);
-
-                        // Redundancy check: existing route_bag entry
-                        // dominates candidate AND boards an at-or-earlier
-                        // trip at pi → candidate is redundant.
-                        let mut redundant = false;
-                        for &(l_existing, t_existing, _) in route_bag.iter() {
-                            let existing_dep = self.get_departure_time(t_existing, pos);
-                            if l_existing.dominates(candidate) && existing_dep <= trip_dep {
-                                redundant = true;
-                                break;
-                            }
-                        }
-                        if redundant {
-                            continue;
-                        }
-
-                        // Remove entries strictly dominated by candidate.
-                        route_bag.retain(|&mut (l_existing, t_existing, _)| {
-                            let existing_dep = self.get_departure_time(t_existing, pos);
-                            !(candidate.dominates(&l_existing) && trip_dep <= existing_dep)
-                        });
-                        route_bag.push((*candidate, trip, pi));
-                    }
-                }
-            }
-
-            // Sparse-set reset of the route queue.
-            for r in q_routes.drain(..) {
-                q_entry[r.idx()] = None;
-            }
-
-            // Refresh target threshold after the route scan, then run
-            // footpath relax. Refresh again after the footpath round so
-            // the next round's boarding decisions use a current threshold.
-            pt_threshold = best_to_any_target(best_arrival, targets);
-            if footpaths_closed {
-                relax_footpaths_round_closed(
-                    self,
-                    k,
-                    labels,
-                    best_arrival,
-                    board_detail,
-                    marked_stops,
-                    pt_threshold,
-                    walked_buf,
-                    ever_reached,
-                );
-            } else {
-                relax_footpaths_round(
-                    self,
-                    k,
-                    labels,
-                    best_arrival,
-                    board_detail,
-                    marked_stops,
-                    pt_threshold,
-                    walked_buf,
-                    relax_heap,
-                    ever_reached,
-                );
-            }
-            for s in walked_buf.drain(..) {
-                marked_stops.insert(s.idx());
-            }
-            pt_threshold = best_to_any_target(best_arrival, targets);
-
-            if marked_stops.is_clear() {
-                break;
-            }
-        }
+        run_raptor_rounds(
+            self,
+            labels,
+            best_arrival,
+            board_detail,
+            marked_stops,
+            q_entry,
+            q_routes,
+            walked_buf,
+            relax_heap,
+            ever_reached,
+            transfers,
+            targets,
+        );
 
         // For each target stop, enumerate every Pareto-optimal label
         // in the target's bag at every round and reconstruct its plan.
