@@ -1156,6 +1156,49 @@ fn reconstruct_journey(
     }
 }
 
+/// Reconstruct one Pareto-front-of-trip-counts worth of journeys
+/// for the given targets at the current cache state. Used by both
+/// the per-call algorithm (after running rounds) and the rRAPTOR
+/// scan (snapshot at end of each τ scan).
+///
+/// Walks each target × round × label-bag entry, traces back via
+/// `reconstruct_journey`, and applies the target's walk-time offset.
+/// Output is unfiltered (caller applies any Pareto front filtering).
+fn extract_target_journeys<L: Label>(
+    labels: &[Vec<LabelBag<L>>],
+    board_detail: &BoardingTree,
+    origin_set: &FixedBitSet,
+    targets: &[(StopIdx, Duration)],
+    transfers: usize,
+) -> Vec<Journey<L>> {
+    let mut journeys: Vec<Journey<L>> = Vec::new();
+    for &(target, walk) in targets {
+        #[allow(clippy::needless_range_loop)]
+        for k in 1..=transfers {
+            let bag_snapshot: SmallVec<[L; 8]> = labels[k][target.idx()].iter().copied().collect();
+            for raw_label in &bag_snapshot {
+                let raw_arr = raw_label.arrival();
+                if raw_arr == SecondOfDay::MAX {
+                    continue;
+                }
+                let Some((origin, plan)) =
+                    reconstruct_journey(board_detail, origin_set, target, raw_arr, k)
+                else {
+                    continue;
+                };
+                let label = raw_label.extend_by_footpath(walk);
+                journeys.push(Journey {
+                    origin,
+                    target,
+                    plan,
+                    label,
+                });
+            }
+        }
+    }
+    journeys
+}
+
 /// Models a route-based transit network for the RAPTOR algorithm.
 ///
 /// Implement this trait to describe your transit network's topology and
@@ -1590,33 +1633,8 @@ pub trait Timetable {
         // in the target's bag at every round and reconstruct its plan.
         // Effective label = bag label extended by the target's walk
         // time offset.
-        let mut journeys: Vec<Journey<L>> = Vec::new();
-        for &(target, walk) in targets {
-            #[allow(clippy::needless_range_loop)]
-            for k in 1..=transfers {
-                // Snapshot to avoid borrowing labels through the trace loop.
-                let bag_snapshot: SmallVec<[L; 8]> =
-                    labels[k][target.idx()].iter().copied().collect();
-                for raw_label in &bag_snapshot {
-                    let raw_arr = raw_label.arrival();
-                    if raw_arr == SecondOfDay::MAX {
-                        continue;
-                    }
-                    let Some((origin, plan)) =
-                        reconstruct_journey(board_detail, origin_set, target, raw_arr, k)
-                    else {
-                        continue;
-                    };
-                    let label = raw_label.extend_by_footpath(walk);
-                    journeys.push(Journey {
-                        origin,
-                        target,
-                        plan,
-                        label,
-                    });
-                }
-            }
-        }
+        let mut journeys =
+            extract_target_journeys(labels, board_detail, origin_set, targets, transfers);
 
         // Output-side Pareto filter on (trip count, label). For any two
         // returned journeys neither weakly dominates the other on the
