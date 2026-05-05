@@ -981,6 +981,120 @@ fn multi_target_walk_offset_picks_best_target() {
 }
 
 #[test]
+fn query_builder_single_departure() {
+    use crate::labels::ArrivalAndWalk;
+
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+    enum S {
+        A,
+        B,
+        C,
+    }
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+    enum R {
+        R1,
+    }
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+    enum Tr {
+        T1,
+    }
+
+    let tt = SimpleTimetable::new().route(
+        R::R1,
+        &[S::A, S::B, S::C],
+        &[(
+            Tr::T1,
+            &[(Tau(0), Tau(0)), (Tau(10), Tau(10)), (Tau(20), Tau(20))],
+        )],
+    );
+    let a = tt.stop_idx_of(&S::A);
+    let c = tt.stop_idx_of(&S::C);
+
+    // 1. Bare typestate flow with all defaults except from/to/depart_at.
+    let journeys = tt.query().from(a).to(c).depart_at(Tau(0)).run();
+    assert_eq!(journeys.len(), 1);
+    assert_eq!(journeys[0].arrival(), Tau(20));
+
+    // 2. With max_transfers and a u8 literal (Into<Transfers>).
+    let journeys = tt
+        .query()
+        .from(a)
+        .to(c)
+        .max_transfers(3u8)
+        .depart_at(Tau(0))
+        .run();
+    assert_eq!(journeys.len(), 1);
+
+    // 3. With explicit cache (run_with_cache).
+    let mut cache = crate::RaptorCache::for_timetable(&tt);
+    let journeys = tt
+        .query()
+        .from(a)
+        .to(c)
+        .depart_at(Tau(0))
+        .run_with_cache(&mut cache);
+    assert_eq!(journeys.len(), 1);
+
+    // 4. Custom label via query_with_label.
+    let journeys: Vec<crate::Journey<ArrivalAndWalk>> = tt
+        .query_with_label::<ArrivalAndWalk>()
+        .from(a)
+        .to(c)
+        .depart_at(Tau(0))
+        .run();
+    assert_eq!(journeys.len(), 1);
+    assert_eq!(journeys[0].label.walk_time, Duration::ZERO);
+}
+
+#[test]
+fn query_builder_range_departure() {
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+    enum S {
+        A,
+        B,
+    }
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+    enum R {
+        R1,
+    }
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+    enum Tr {
+        T1,
+        T2,
+        T3,
+    }
+
+    let tt = SimpleTimetable::new().route(
+        R::R1,
+        &[S::A, S::B],
+        &[
+            (Tr::T1, &[(Tau(0), Tau(0)), (Tau(10), Tau(10))]),
+            (Tr::T2, &[(Tau(10), Tau(10)), (Tau(20), Tau(20))]),
+            (Tr::T3, &[(Tau(20), Tau(20)), (Tau(30), Tau(30))]),
+        ],
+    );
+    let a = tt.stop_idx_of(&S::A);
+    let b = tt.stop_idx_of(&S::B);
+
+    let profile = tt
+        .query()
+        .from(a)
+        .to(b)
+        .depart_in_window([Tau(0), Tau(5), Tau(10), Tau(15), Tau(20)])
+        .run();
+
+    let mut points: Vec<(Tau, Tau)> = profile
+        .iter()
+        .map(|p| (p.depart, p.journey.arrival()))
+        .collect();
+    points.sort();
+    assert_eq!(
+        points,
+        vec![(Tau(0), Tau(10)), (Tau(10), Tau(20)), (Tau(20), Tau(30))]
+    );
+}
+
+#[test]
 fn into_endpoints_accepts_natural_input_shapes() {
     // The single-stop call is the headline ergonomics win — `start` and
     // `end` go straight in, no slice-of-tuples wrapping.

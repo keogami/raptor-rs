@@ -1282,6 +1282,55 @@ pub trait Timetable {
         self.raptor_with_cache_and_label::<ArrivalTime>(cache, transfers, tau, origins, targets)
     }
 
+    /// Start a typestate-builder query. Returns a [`Query`] in the
+    /// [`NeedsDeparture`] state. Call `.from(...).to(...).max_transfers(...)`
+    /// (any order, all optional with defaults), then either
+    /// `.depart_at(...)` for a single-departure query or
+    /// `.depart_in_window(...)` for a range query, then `.run()`.
+    ///
+    /// ```no_run
+    /// # use raptor::{Timetable, Tau, Duration, StopIdx};
+    /// # fn ex<T: Timetable>(tt: &T, start: StopIdx, end: StopIdx) {
+    /// let journeys = tt
+    ///     .query()
+    ///     .from(start)
+    ///     .to(end)
+    ///     .max_transfers(10u8)
+    ///     .depart_at(Tau::hms(9, 0, 0))
+    ///     .run();
+    /// # }
+    /// ```
+    fn query(&self) -> Query<'_, Self, ArrivalTime, NeedsDeparture>
+    where
+        Self: Sized,
+    {
+        Query {
+            tt: self,
+            origins: Endpoints::new(),
+            targets: Endpoints::new(),
+            max_transfers: Transfers(10),
+            mode: NeedsDeparture,
+            _label: std::marker::PhantomData,
+        }
+    }
+
+    /// Like [`Timetable::query`] but with a custom [`Label`] type.
+    /// `Vec<Journey<L>>` and `Vec<RangeJourney<L>>` come back from
+    /// the corresponding `.run()`.
+    fn query_with_label<L: Label>(&self) -> Query<'_, Self, L, NeedsDeparture>
+    where
+        Self: Sized,
+    {
+        Query {
+            tt: self,
+            origins: Endpoints::new(),
+            targets: Endpoints::new(),
+            max_transfers: Transfers(10),
+            mode: NeedsDeparture,
+            _label: std::marker::PhantomData,
+        }
+    }
+
     /// Generic variant of [`Timetable::raptor_with_cache`] over a
     /// custom [`Label`] type. The label parameter `L` is inferred
     /// from `cache: &mut RaptorCache<L>`, so callers don't need to
@@ -1696,6 +1745,177 @@ pub struct RangeJourney<L: Label = ArrivalTime> {
     /// The journey itself, as if `depart` had been passed to
     /// [`Timetable::raptor`] directly.
     pub journey: Journey<L>,
+}
+
+// ── Query builder ──────────────────────────────────────────────────
+
+/// Marker type: a `Query` that hasn't yet had a departure configured.
+/// `.run()` is not callable in this state; call [`Query::depart_at`]
+/// (single departure) or [`Query::depart_in_window`] (range query)
+/// first.
+#[derive(Debug, Clone, Copy)]
+pub struct NeedsDeparture;
+
+/// Marker type: a single-departure `Query`. `.run()` returns
+/// `Vec<Journey<L>>`.
+#[derive(Debug, Clone, Copy)]
+pub struct SingleDeparture {
+    tau: Tau,
+}
+
+/// Marker type: a range-query `Query` over a window of departure
+/// times (collected eagerly into a `Vec<Tau>` at builder time).
+/// `.run()` returns `Vec<RangeJourney<L>>`.
+#[derive(Debug, Clone)]
+pub struct RangeDeparture {
+    departures: Vec<Tau>,
+}
+
+/// Builder for a RAPTOR query. Constructed via [`Timetable::query`].
+///
+/// Typestate enforces the construction order:
+///
+/// - The initial state ([`NeedsDeparture`]) admits the optional-input
+///   methods ([`Query::from`], [`Query::to`], [`Query::max_transfers`])
+///   plus a single departure-mode transition
+///   ([`Query::depart_at`] or [`Query::depart_in_window`]).
+/// - Once a departure mode is set ([`SingleDeparture`] or
+///   [`RangeDeparture`]) the only further method is [`Query::run`] —
+///   plus [`Query::run_with_cache`] for explicit cache reuse. The
+///   return type of `.run()` matches the departure mode.
+///
+/// Type parameters:
+///
+/// - `'tt`: borrow of the [`Timetable`].
+/// - `T`: the timetable type.
+/// - `L`: the [`Label`] type. Defaults to [`ArrivalTime`]. Pass a
+///   different label by entering via [`Timetable::query_with_label`].
+/// - `M`: the typestate marker. Defaults to [`NeedsDeparture`].
+#[derive(Debug, Clone)]
+pub struct Query<'tt, T, L = ArrivalTime, M = NeedsDeparture>
+where
+    T: Timetable + ?Sized,
+    L: Label,
+{
+    tt: &'tt T,
+    origins: Endpoints,
+    targets: Endpoints,
+    max_transfers: Transfers,
+    mode: M,
+    _label: std::marker::PhantomData<L>,
+}
+
+// ----- Stage 1: NeedsDeparture — optional inputs and mode transitions -----
+
+impl<'tt, T, L> Query<'tt, T, L, NeedsDeparture>
+where
+    T: Timetable + ?Sized,
+    L: Label,
+{
+    /// Set the origin endpoints. Replaces any previously-set origins.
+    /// Accepts any [`IntoEndpoints`] shape (single stop, slice, vec).
+    pub fn from(mut self, ep: impl IntoEndpoints) -> Self {
+        self.origins = ep.into_endpoints();
+        self
+    }
+
+    /// Set the target endpoints. Replaces any previously-set targets.
+    pub fn to(mut self, ep: impl IntoEndpoints) -> Self {
+        self.targets = ep.into_endpoints();
+        self
+    }
+
+    /// Cap the number of transit boardings the algorithm explores.
+    /// The default is 10. Accepts any `Into<Transfers>` (e.g. a `u8`
+    /// literal works directly).
+    pub fn max_transfers(mut self, n: impl Into<Transfers>) -> Self {
+        self.max_transfers = n.into();
+        self
+    }
+
+    /// Configure a single-departure query. After this call, `.run()`
+    /// returns `Vec<Journey<L>>`.
+    pub fn depart_at(self, t: impl Into<Tau>) -> Query<'tt, T, L, SingleDeparture> {
+        Query {
+            tt: self.tt,
+            origins: self.origins,
+            targets: self.targets,
+            max_transfers: self.max_transfers,
+            mode: SingleDeparture { tau: t.into() },
+            _label: std::marker::PhantomData,
+        }
+    }
+
+    /// Configure a range query over the supplied departure times.
+    /// Collected eagerly into a `Vec<Tau>` at builder time. After
+    /// this call, `.run()` returns `Vec<RangeJourney<L>>`.
+    pub fn depart_in_window(
+        self,
+        deps: impl IntoIterator<Item = Tau>,
+    ) -> Query<'tt, T, L, RangeDeparture> {
+        Query {
+            tt: self.tt,
+            origins: self.origins,
+            targets: self.targets,
+            max_transfers: self.max_transfers,
+            mode: RangeDeparture {
+                departures: deps.into_iter().collect(),
+            },
+            _label: std::marker::PhantomData,
+        }
+    }
+}
+
+// ----- Stage 2a: SingleDeparture — terminal `.run()` -----
+
+impl<'tt, T, L> Query<'tt, T, L, SingleDeparture>
+where
+    T: Timetable + Sized,
+    L: Label,
+{
+    /// Execute the query, allocating a fresh [`RaptorCache`].
+    pub fn run(self) -> Vec<Journey<L>> {
+        let mut cache = RaptorCache::<L>::for_timetable(self.tt);
+        self.run_with_cache(&mut cache)
+    }
+
+    /// Execute the query, reusing `cache`. The cache must be sized
+    /// for the same timetable; passing one sized differently panics
+    /// inside `RaptorCache::reset_for_query`.
+    pub fn run_with_cache(self, cache: &mut RaptorCache<L>) -> Vec<Journey<L>> {
+        self.tt.raptor_with_cache_and_label(
+            cache,
+            self.max_transfers.0 as usize,
+            self.mode.tau,
+            self.origins,
+            self.targets,
+        )
+    }
+}
+
+// ----- Stage 2b: RangeDeparture — terminal `.run()` -----
+
+impl<'tt, T, L> Query<'tt, T, L, RangeDeparture>
+where
+    T: Timetable + Sized,
+    L: Label,
+{
+    /// Execute the range query, allocating a fresh [`RaptorCache`].
+    pub fn run(self) -> Vec<RangeJourney<L>> {
+        let mut cache = RaptorCache::<L>::for_timetable(self.tt);
+        self.run_with_cache(&mut cache)
+    }
+
+    /// Execute the range query, reusing `cache`.
+    pub fn run_with_cache(self, cache: &mut RaptorCache<L>) -> Vec<RangeJourney<L>> {
+        self.tt.raptor_range_with_cache(
+            cache,
+            self.max_transfers.0 as usize,
+            self.mode.departures,
+            self.origins,
+            self.targets,
+        )
+    }
 }
 
 /// Reusable scratch buffers for [`Timetable::raptor_with_cache`].
