@@ -23,7 +23,7 @@ fn main() -> anyhow::Result<()> {
         let total = gtfs.trips.len();
         let mut bad_trips = 0usize;
         let mut bad_route_ids: HashSet<&str> = HashSet::new();
-        for (_trip_id, trip) in &gtfs.trips {
+        for trip in gtfs.trips.values() {
             let mut seen: HashSet<&str> = HashSet::new();
             let mut had_dup = false;
             for st in &trip.stop_times {

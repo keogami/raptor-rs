@@ -15,15 +15,15 @@ fn main() -> anyhow::Result<()> {
         let mut prev_dep: Option<u32> = None;
         for (i, st) in trip.stop_times.iter().enumerate() {
             let dep = st.departure_time.unwrap_or(0);
-            if let Some(p) = prev_dep {
-                if dep < p {
-                    bad += 1;
-                    if shown < 10 {
-                        println!("trip {trip_id} stop {i}: dep_time={} (prev was {})", dep, p);
-                        shown += 1;
-                    }
-                    break;
+            if let Some(p) = prev_dep
+                && dep < p
+            {
+                bad += 1;
+                if shown < 10 {
+                    println!("trip {trip_id} stop {i}: dep_time={dep} (prev was {p})");
+                    shown += 1;
                 }
+                break;
             }
             prev_dep = Some(dep);
         }
