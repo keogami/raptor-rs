@@ -32,7 +32,7 @@ let journeys = timetable
     .query()
     .from(start)
     .to(target)
-    .max_transfers(10u8)
+    .max_transfers(10)
     .depart_at(SecondOfDay::hms(9, 0, 0))
     .run();
 
@@ -65,7 +65,7 @@ let journeys = timetable
     .query()
     .from(timetable.station_stops("berlin_hbf"))   // 301 platforms
     .to(timetable.station_stops("berlin_alex"))    // 50 platforms
-    .max_transfers(10u8)
+    .max_transfers(10)
     .depart_at(SecondOfDay::hms(9, 0, 0))
     .run();
 ```
@@ -162,8 +162,12 @@ let profile = tt
     .query()
     .from(start)
     .to(end)
-    .max_transfers(10u8)
-    .depart_in_window((17 * 3600..18 * 3600).step_by(60).map(SecondOfDay::from_secs))
+    .max_transfers(10)
+    .depart_in_window(SecondOfDay::every(
+        SecondOfDay::hms(17, 0, 0),
+        SecondOfDay::hms(18, 0, 0),
+        60,
+    ))
     .run();
 for entry in &profile {
     println!("leave at {}, arrive at {}", entry.depart, entry.journey.arrival());

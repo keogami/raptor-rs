@@ -76,7 +76,7 @@ fn main() {
         .query()
         .from(&[(StopIdx::new(0), raptor::Duration::ZERO)])
         .to(&[(StopIdx::new(9), raptor::Duration::ZERO)])
-        .max_transfers(10u8)
+        .max_transfers(10)
         .depart_at(SecondOfDay(0))
         .run();
 

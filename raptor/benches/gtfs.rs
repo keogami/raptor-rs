@@ -69,7 +69,7 @@ fn bench_gtfs_query(c: &mut Criterion) {
                         .query()
                         .from(&[(start, Duration::ZERO)])
                         .to(&[(target, Duration::ZERO)])
-                        .max_transfers(10u8)
+                        .max_transfers(10)
                         .depart_at(DEPARTURE_TIME)
                         .run_with_cache(&mut cache);
                     black_box(&journeys);

@@ -128,7 +128,7 @@ fn main() {
         .query()
         .from(&[(StopIdx::new(1), Duration::ZERO)])
         .to(&[(StopIdx::new(9), Duration::ZERO)])
-        .max_transfers(10u8)
+        .max_transfers(10)
         .depart_at(SecondOfDay(0))
         .run();
 

@@ -95,7 +95,7 @@ fn reboarding_picks_correct_boarding_stop() {
         .query()
         .from(&[(tt.stop_idx_of(&S), Duration::ZERO)])
         .to(&[(tt.stop_idx_of(&D), Duration::ZERO)])
-        .max_transfers(3u8)
+        .max_transfers(3)
         .depart_at(SecondOfDay(0))
         .run();
 
@@ -157,7 +157,7 @@ fn no_journey_disconnected_graph() {
         .query()
         .from(&[(tt.stop_idx_of(&Stop::A), Duration::ZERO)])
         .to(&[(tt.stop_idx_of(&Stop::D), Duration::ZERO)])
-        .max_transfers(3u8)
+        .max_transfers(3)
         .depart_at(SecondOfDay(0))
         .run();
     assert!(
@@ -213,7 +213,7 @@ fn no_journey_missed_connection() {
         .query()
         .from(&[(tt.stop_idx_of(&Stop::A), Duration::ZERO)])
         .to(&[(tt.stop_idx_of(&Stop::C), Duration::ZERO)])
-        .max_transfers(3u8)
+        .max_transfers(3)
         .depart_at(SecondOfDay(0))
         .run();
     assert!(
@@ -254,7 +254,7 @@ fn no_journey_late_departure() {
         .query()
         .from(&[(tt.stop_idx_of(&Stop::A), Duration::ZERO)])
         .to(&[(tt.stop_idx_of(&Stop::B), Duration::ZERO)])
-        .max_transfers(3u8)
+        .max_transfers(3)
         .depart_at(SecondOfDay(100))
         .run();
     assert!(
@@ -295,7 +295,7 @@ fn no_journey_transfers_zero() {
         .query()
         .from(&[(tt.stop_idx_of(&Stop::A), Duration::ZERO)])
         .to(&[(tt.stop_idx_of(&Stop::B), Duration::ZERO)])
-        .max_transfers(0u8)
+        .max_transfers(0)
         .depart_at(SecondOfDay(0))
         .run();
     assert!(journeys.is_empty(), "transfers=0 should yield no journeys");
@@ -333,7 +333,7 @@ fn source_equals_target() {
         .query()
         .from(&[(tt.stop_idx_of(&Stop::A), Duration::ZERO)])
         .to(&[(tt.stop_idx_of(&Stop::A), Duration::ZERO)])
-        .max_transfers(3u8)
+        .max_transfers(3)
         .depart_at(SecondOfDay(0))
         .run();
     assert!(
@@ -376,7 +376,7 @@ fn direct_journey_single_route() {
         .query()
         .from(&[(tt.stop_idx_of(&Stop::A), Duration::ZERO)])
         .to(&[(tt.stop_idx_of(&Stop::C), Duration::ZERO)])
-        .max_transfers(3u8)
+        .max_transfers(3)
         .depart_at(SecondOfDay(0))
         .run();
     assert_eq!(journeys.len(), 1);
@@ -430,7 +430,7 @@ fn direct_journey_picks_fastest_route() {
         .query()
         .from(&[(tt.stop_idx_of(&Stop::A), Duration::ZERO)])
         .to(&[(tt.stop_idx_of(&Stop::B), Duration::ZERO)])
-        .max_transfers(3u8)
+        .max_transfers(3)
         .depart_at(SecondOfDay(0))
         .run();
     let best = journeys.iter().min_by_key(|j| j.arrival()).unwrap();
@@ -484,7 +484,7 @@ fn exact_time_connection() {
         .query()
         .from(&[(tt.stop_idx_of(&Stop::A), Duration::ZERO)])
         .to(&[(tt.stop_idx_of(&Stop::C), Duration::ZERO)])
-        .max_transfers(3u8)
+        .max_transfers(3)
         .depart_at(SecondOfDay(0))
         .run();
     assert!(!journeys.is_empty(), "exact-time connection should work");
@@ -547,7 +547,7 @@ fn multi_trip_picks_earliest_catchable() {
         .query()
         .from(&[(tt.stop_idx_of(&Stop::A), Duration::ZERO)])
         .to(&[(tt.stop_idx_of(&Stop::B), Duration::ZERO)])
-        .max_transfers(3u8)
+        .max_transfers(3)
         .depart_at(SecondOfDay(12))
         .run();
     assert_eq!(journeys.len(), 1);
@@ -615,7 +615,7 @@ fn two_transfer_journey() {
         .query()
         .from(&[(tt.stop_idx_of(&Stop::A), Duration::ZERO)])
         .to(&[(tt.stop_idx_of(&Stop::D), Duration::ZERO)])
-        .max_transfers(3u8)
+        .max_transfers(3)
         .depart_at(SecondOfDay(0))
         .run();
     assert!(!journeys.is_empty());
@@ -693,7 +693,7 @@ fn pareto_optimal_fewer_transfers_vs_faster() {
         .query()
         .from(&[(tt.stop_idx_of(&Stop::A), Duration::ZERO)])
         .to(&[(tt.stop_idx_of(&Stop::D), Duration::ZERO)])
-        .max_transfers(3u8)
+        .max_transfers(3)
         .depart_at(SecondOfDay(0))
         .run();
     assert_eq!(journeys.len(), 2, "should have 2 pareto-optimal journeys");
@@ -761,7 +761,7 @@ fn footpath_enables_connection() {
         .query()
         .from(&[(tt.stop_idx_of(&Stop::A), Duration::ZERO)])
         .to(&[(tt.stop_idx_of(&Stop::D), Duration::ZERO)])
-        .max_transfers(3u8)
+        .max_transfers(3)
         .depart_at(SecondOfDay(0))
         .run();
     assert_eq!(journeys.len(), 1, "expected one journey, got {journeys:?}");
@@ -822,7 +822,7 @@ fn footpath_transfer_time_causes_miss() {
         .query()
         .from(&[(tt.stop_idx_of(&Stop::A), Duration::ZERO)])
         .to(&[(tt.stop_idx_of(&Stop::D), Duration::ZERO)])
-        .max_transfers(3u8)
+        .max_transfers(3)
         .depart_at(SecondOfDay(0))
         .run();
     assert!(
@@ -863,14 +863,14 @@ fn early_termination_no_improvement() {
         .query()
         .from(&[(tt.stop_idx_of(&Stop::A), Duration::ZERO)])
         .to(&[(tt.stop_idx_of(&Stop::B), Duration::ZERO)])
-        .max_transfers(1u8)
+        .max_transfers(1)
         .depart_at(SecondOfDay(0))
         .run();
     let j100 = tt
         .query()
         .from(&[(tt.stop_idx_of(&Stop::A), Duration::ZERO)])
         .to(&[(tt.stop_idx_of(&Stop::B), Duration::ZERO)])
-        .max_transfers(100u8)
+        .max_transfers(100)
         .depart_at(SecondOfDay(0))
         .run();
 
@@ -927,7 +927,7 @@ fn dominance_prunes_slower_arrival() {
         .query()
         .from(&[(tt.stop_idx_of(&Stop::A), Duration::ZERO)])
         .to(&[(tt.stop_idx_of(&Stop::B), Duration::ZERO)])
-        .max_transfers(3u8)
+        .max_transfers(3)
         .depart_at(SecondOfDay(0))
         .run();
     // Both routes are discovered in round 1, so the slower one is dominated
@@ -1075,7 +1075,7 @@ fn multi_source_picks_best_origin() {
         .query()
         .from(&[(a, Duration::ZERO), (b, Duration::ZERO)])
         .to(&[(c, Duration::ZERO)])
-        .max_transfers(3u8)
+        .max_transfers(3)
         .depart_at(SecondOfDay(0))
         .run();
     assert_eq!(journeys.len(), 1, "one Pareto-optimal journey expected");
@@ -1153,7 +1153,7 @@ fn multi_source_walk_offset_changes_best_origin() {
         .query()
         .from(&[(a, Duration(30)), (b, Duration::ZERO)])
         .to(&[(c, Duration::ZERO)])
-        .max_transfers(3u8)
+        .max_transfers(3)
         .depart_at(SecondOfDay(0))
         .run();
     let best = journeys.iter().min_by_key(|j| j.arrival()).unwrap();
@@ -1217,7 +1217,7 @@ fn multi_target_walk_offset_picks_best_target() {
         .query()
         .from(&[(a, Duration::ZERO)])
         .to(&[(t1, Duration(30)), (t2, Duration::ZERO)])
-        .max_transfers(3u8)
+        .max_transfers(3)
         .depart_at(SecondOfDay(0))
         .run();
     let best = journeys.iter().min_by_key(|j| j.arrival()).unwrap();
@@ -1271,7 +1271,7 @@ fn query_builder_single_departure() {
         .query()
         .from(a)
         .to(c)
-        .max_transfers(3u8)
+        .max_transfers(3)
         .depart_at(SecondOfDay(0))
         .run();
     assert_eq!(journeys.len(), 1);
@@ -1413,7 +1413,7 @@ fn into_endpoints_accepts_natural_input_shapes() {
         .query()
         .from(a)
         .to(c)
-        .max_transfers(3u8)
+        .max_transfers(3)
         .depart_at(SecondOfDay(0))
         .run();
     assert_eq!(j.len(), 1);
@@ -1425,7 +1425,7 @@ fn into_endpoints_accepts_natural_input_shapes() {
         .query()
         .from((a, Duration::ZERO))
         .to(c)
-        .max_transfers(3u8)
+        .max_transfers(3)
         .depart_at(SecondOfDay(0))
         .run();
     assert_eq!(j[0].arrival(), SecondOfDay(20));
@@ -1436,7 +1436,7 @@ fn into_endpoints_accepts_natural_input_shapes() {
         .query()
         .from(&stops[..])
         .to(c)
-        .max_transfers(3u8)
+        .max_transfers(3)
         .depart_at(SecondOfDay(0))
         .run();
     assert_eq!(j[0].arrival(), SecondOfDay(20));
@@ -1447,7 +1447,7 @@ fn into_endpoints_accepts_natural_input_shapes() {
         .query()
         .from(&pairs[..])
         .to(&[(c, Duration::ZERO)][..])
-        .max_transfers(3u8)
+        .max_transfers(3)
         .depart_at(SecondOfDay(0))
         .run();
     assert_eq!(j[0].arrival(), SecondOfDay(20));
@@ -1458,7 +1458,7 @@ fn into_endpoints_accepts_natural_input_shapes() {
         .query()
         .from(&owned)
         .to(c)
-        .max_transfers(3u8)
+        .max_transfers(3)
         .depart_at(SecondOfDay(0))
         .run();
     assert_eq!(j[0].arrival(), SecondOfDay(20));
@@ -1470,7 +1470,7 @@ fn into_endpoints_accepts_natural_input_shapes() {
         .query()
         .from(ep)
         .to(c)
-        .max_transfers(3u8)
+        .max_transfers(3)
         .depart_at(SecondOfDay(0))
         .run();
     assert_eq!(j[0].arrival(), SecondOfDay(20));
@@ -1574,14 +1574,14 @@ fn closed_path_dispatch_matches_dijkstra() {
         .query()
         .from(&[(a, Duration::ZERO)])
         .to(&[(d, Duration::ZERO)])
-        .max_transfers(3u8)
+        .max_transfers(3)
         .depart_at(SecondOfDay(0))
         .run();
     let closed = ClosedAssert(inner)
         .query()
         .from(a)
         .to(d)
-        .max_transfers(3u8)
+        .max_transfers(3)
         .depart_at(SecondOfDay(0))
         .run();
 
@@ -1646,7 +1646,7 @@ fn arrival_and_walk_label_tracks_accumulated_walk_time() {
         .query()
         .from(&[(a, Duration::ZERO)])
         .to(&[(c, Duration::ZERO)])
-        .max_transfers(3u8)
+        .max_transfers(3)
         .depart_at(SecondOfDay(0))
         .run();
     assert!(!default_journeys.is_empty());
@@ -1657,7 +1657,7 @@ fn arrival_and_walk_label_tracks_accumulated_walk_time() {
         .query_with_label::<ArrivalAndWalk>()
         .from(a)
         .to(c)
-        .max_transfers(3u8)
+        .max_transfers(3)
         .depart_at(SecondOfDay(0))
         .run();
     assert_eq!(label_journeys.len(), default_journeys.len());
@@ -1674,7 +1674,7 @@ fn arrival_and_walk_label_tracks_accumulated_walk_time() {
         .query_with_label::<ArrivalAndWalk>()
         .from(a)
         .to(c)
-        .max_transfers(3u8)
+        .max_transfers(3)
         .depart_at(SecondOfDay(0))
         .run_with_cache(&mut cache);
     assert_eq!(cached.len(), 1);
@@ -1743,7 +1743,7 @@ fn raptor_range_returns_pareto_profile_across_departures() {
         .query()
         .from(&[(a, Duration::ZERO)])
         .to(&[(b, Duration::ZERO)])
-        .max_transfers(3u8)
+        .max_transfers(3)
         .depart_in_window([
             SecondOfDay(0),
             SecondOfDay(5),
@@ -1835,7 +1835,7 @@ fn arrival_and_walk_returns_pareto_front() {
         .query()
         .from(&[(a, Duration::ZERO)])
         .to(&[(t, Duration::ZERO)])
-        .max_transfers(3u8)
+        .max_transfers(3)
         .depart_at(SecondOfDay(0))
         .run();
     assert_eq!(arrival_only.len(), 1);
@@ -1846,7 +1846,7 @@ fn arrival_and_walk_returns_pareto_front() {
         .query_with_label::<ArrivalAndWalk>()
         .from(a)
         .to(t)
-        .max_transfers(3u8)
+        .max_transfers(3)
         .depart_at(SecondOfDay(0))
         .run();
     assert_eq!(
@@ -1930,7 +1930,7 @@ fn with_timing_recovers_per_leg_trip_and_times() {
         .query()
         .from(&[(a, Duration::ZERO)])
         .to(&[(c, Duration::ZERO)])
-        .max_transfers(3u8)
+        .max_transfers(3)
         .depart_at(SecondOfDay(0))
         .run();
     assert_eq!(journeys.len(), 1);
@@ -2020,7 +2020,7 @@ fn with_timing_handles_one_hop_walking_transfer() {
         .query()
         .from(&[(a, Duration::ZERO)])
         .to(&[(d, Duration::ZERO)])
-        .max_transfers(3u8)
+        .max_transfers(3)
         .depart_at(SecondOfDay(0))
         .run();
     assert_eq!(journeys.len(), 1);

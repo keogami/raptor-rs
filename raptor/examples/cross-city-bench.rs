@@ -217,7 +217,7 @@ fn main() -> anyhow::Result<()> {
                     .query()
                     .from(&origins)
                     .to(&targets)
-                    .max_transfers(10u8)
+                    .max_transfers(10)
                     .depart_at(DEPARTURE_TIME)
                     .run_with_cache(&mut cache);
             }
@@ -232,7 +232,7 @@ fn main() -> anyhow::Result<()> {
                     .query()
                     .from(&origins)
                     .to(&targets)
-                    .max_transfers(10u8)
+                    .max_transfers(10)
                     .depart_at(DEPARTURE_TIME)
                     .run_with_cache(&mut cache);
                 samples_ns.push(t0.elapsed().as_nanos());

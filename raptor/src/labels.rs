@@ -31,7 +31,7 @@ use crate::{Duration, Label, SecondOfDay};
 ///     .query_with_label::<ArrivalAndWalk>()
 ///     .from(start)
 ///     .to(target)
-///     .max_transfers(10u8)
+///     .max_transfers(10)
 ///     .depart_at(SecondOfDay::hms(9, 0, 0))
 ///     .run();
 /// for j in &journeys {

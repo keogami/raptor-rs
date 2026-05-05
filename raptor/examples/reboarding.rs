@@ -150,7 +150,7 @@ fn main() {
         .query()
         .from(&[(S, Duration::ZERO)])
         .to(&[(D, Duration::ZERO)])
-        .max_transfers(3u8)
+        .max_transfers(3)
         .depart_at(SecondOfDay(0))
         .run();
 

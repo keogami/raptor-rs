@@ -42,7 +42,7 @@ fn main() -> anyhow::Result<()> {
         .query()
         .from(&[(start_idx, Duration::ZERO)])
         .to(&[(target_idx, Duration::ZERO)])
-        .max_transfers(10u8)
+        .max_transfers(10)
         .depart_at(departure_time)
         .run();
 

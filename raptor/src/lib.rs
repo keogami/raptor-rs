@@ -30,7 +30,7 @@
 //!     .query()
 //!     .from(start)
 //!     .to(target)
-//!     .max_transfers(10u8)
+//!     .max_transfers(10)
 //!     .depart_at(SecondOfDay::hms(9, 0, 0))
 //!     .run();
 //!
@@ -135,6 +135,34 @@ impl SecondOfDay {
     /// `(hours, minutes, seconds)` decomposition.
     pub const fn as_hms(self) -> (u32, u32, u32) {
         (self.0 / 3600, (self.0 / 60) % 60, self.0 % 60)
+    }
+
+    /// Iterator of departure times from `start` (inclusive) to `end`
+    /// (exclusive) at `step`-second intervals. Convenience for the
+    /// common range-query input pattern:
+    ///
+    /// ```
+    /// # use raptor::SecondOfDay;
+    /// let deps: Vec<_> = SecondOfDay::every(
+    ///     SecondOfDay::hms(17, 0, 0),
+    ///     SecondOfDay::hms(17, 5, 0),
+    ///     60,
+    /// ).collect();
+    /// assert_eq!(deps.len(), 5);
+    /// assert_eq!(deps[0], SecondOfDay::hms(17, 0, 0));
+    /// assert_eq!(deps[4], SecondOfDay::hms(17, 4, 0));
+    /// ```
+    ///
+    /// Pass directly to
+    /// [`Query::depart_in_window`](crate::Query::depart_in_window).
+    pub fn every(
+        start: SecondOfDay,
+        end: SecondOfDay,
+        step: u32,
+    ) -> impl Iterator<Item = SecondOfDay> + Clone {
+        (start.0..end.0)
+            .step_by(step.max(1) as usize)
+            .map(SecondOfDay)
     }
 }
 
@@ -535,15 +563,25 @@ impl IntoEndpoints for Endpoints {
 
 /// A label attached to a `(round, stop)` cell during the RAPTOR scan.
 ///
-/// In single-criterion routing this is just an arrival time
-/// ([`ArrivalTime`]). The trait is the seam where multi-criterion
-/// label types (walking time, transfer slack, fare zones) plug in
-/// without touching the core algorithm. The algorithm maintains a
-/// Pareto front (a *bag* of mutually non-dominated labels) per
-/// `(round, stop)`, so multi-criterion impls produce real Pareto
-/// fronts at the targets rather than a single tiebroken label.
-/// Single-criterion `ArrivalTime` bags stay size 1, with no
-/// behaviour change versus a non-bag implementation.
+/// **Most users can ignore this trait.** [`Timetable::query`] uses
+/// [`ArrivalTime`] (single-criterion: minimise arrival time, fewest
+/// transfers), which is what the original RAPTOR paper describes and
+/// what almost every routing application wants.
+///
+/// The trait exists so the algorithm can be reused for *multi-criterion*
+/// routing — minimising arrival time *and* something else at the same
+/// time, returning a Pareto front of trade-offs. Reach for it when a
+/// single "best" answer is the wrong shape: e.g. an accessibility-aware
+/// query that should also report the route with less walking, even if
+/// it arrives slightly later. The bundled [`labels::ArrivalAndWalk`]
+/// is one such impl; see also [`Timetable::query_with_label`] for the
+/// builder entry point.
+///
+/// The algorithm maintains a Pareto front (a *bag* of mutually
+/// non-dominated labels) per `(round, stop)`, so multi-criterion impls
+/// produce real Pareto fronts at the targets rather than a single
+/// tiebroken label. Single-criterion `ArrivalTime` bags stay size 1,
+/// with no behaviour change versus a non-bag implementation.
 pub trait Label: Copy + std::fmt::Debug {
     /// The "unreached" sentinel. The algorithm initialises every
     /// `(round, stop)` cell to this value before seeding origins.
@@ -1236,7 +1274,7 @@ pub trait Timetable {
     ///     .query()
     ///     .from(start)
     ///     .to(end)
-    ///     .max_transfers(10u8)
+    ///     .max_transfers(10)
     ///     .depart_at(SecondOfDay::hms(9, 0, 0))
     ///     .run();
     /// # }
@@ -1255,9 +1293,30 @@ pub trait Timetable {
         }
     }
 
-    /// Like [`Timetable::query`] but with a custom [`Label`] type.
-    /// `Vec<Journey<L>>` and `Vec<RangeJourney<L>>` come back from
-    /// the corresponding `.run()`.
+    /// Like [`Timetable::query`] but with a custom [`Label`] type for
+    /// multi-criterion routing. `Vec<Journey<L>>` and `Vec<RangeJourney<L>>`
+    /// come back from the corresponding `.run()`, with each entry on the
+    /// returned Pareto front a different trade-off across `L`'s criteria.
+    ///
+    /// You only need this if [`ArrivalTime`] (the default) is the wrong
+    /// shape for your problem — e.g. you want to surface a slower route
+    /// with less walking. The bundled [`labels::ArrivalAndWalk`] does
+    /// exactly that. See the [`Label`] trait for what's involved in
+    /// writing your own.
+    ///
+    /// ```no_run
+    /// # use raptor::{Timetable, SecondOfDay, StopIdx};
+    /// # use raptor::labels::ArrivalAndWalk;
+    /// # fn ex<T: Timetable>(tt: &T, start: StopIdx, end: StopIdx) {
+    /// let pareto_front = tt
+    ///     .query_with_label::<ArrivalAndWalk>()
+    ///     .from(start)
+    ///     .to(end)
+    ///     .max_transfers(10)
+    ///     .depart_at(SecondOfDay::hms(9, 0, 0))
+    ///     .run();
+    /// # }
+    /// ```
     fn query_with_label<L: Label>(&self) -> Query<'_, Self, L, NeedsDeparture>
     where
         Self: Sized,
@@ -1739,10 +1798,10 @@ where
     }
 
     /// Cap the number of transit boardings the algorithm explores.
-    /// The default is 10. Accepts any `Into<Transfers>` (e.g. a `u8`
-    /// literal works directly).
-    pub fn max_transfers(mut self, n: impl Into<Transfers>) -> Self {
-        self.max_transfers = n.into();
+    /// The default is 10. Pass an integer literal — `.max_transfers(10)`
+    /// works directly, no suffix needed.
+    pub fn max_transfers(mut self, n: u8) -> Self {
+        self.max_transfers = Transfers(n);
         self
     }
 
