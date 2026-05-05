@@ -1888,14 +1888,17 @@ where
         self,
         deps: impl IntoIterator<Item = SecondOfDay>,
     ) -> Query<'tt, T, L, RangeDeparture> {
+        let mut departures: Vec<SecondOfDay> = deps.into_iter().collect();
+        // rRAPTOR processes descending; sort+dedupe once at builder
+        // time so both serial and parallel paths see canonical input.
+        departures.sort_unstable_by(|a, b| b.cmp(a));
+        departures.dedup();
         Query {
             tt: self.tt,
             origins: self.origins,
             targets: self.targets,
             max_transfers: self.max_transfers,
-            mode: RangeDeparture {
-                departures: deps.into_iter().collect(),
-            },
+            mode: RangeDeparture { departures },
             _label: std::marker::PhantomData,
         }
     }
