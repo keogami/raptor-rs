@@ -2335,4 +2335,34 @@ fn newly_active_stops_marks_only_in_window() {
     let mut marked3 = FixedBitSet::with_capacity(tt.n_stops());
     newly_active_stops_into(&tt, SecondOfDay(120), SecondOfDay(140), &mut marked3);
     assert_eq!(marked3.count_ones(..), 0);
+
+    // Boundary: dep == lo is included (lower bound is inclusive).
+    // Window [200, 250): T2 has A=200 (hits lo, included) and B=210 (in window),
+    // so A and B are marked. T5's C=250 hits hi exactly and is excluded; T4's
+    // C=150 is below lo. Hence C and D must NOT be marked.
+    let mut marked4 = FixedBitSet::with_capacity(tt.n_stops());
+    newly_active_stops_into(&tt, SecondOfDay(200), SecondOfDay(250), &mut marked4);
+    assert!(marked4.contains(tt.stop_idx_of(&S::A).idx()));
+    assert!(marked4.contains(tt.stop_idx_of(&S::B).idx()));
+    assert!(!marked4.contains(tt.stop_idx_of(&S::C).idx()));
+    assert!(!marked4.contains(tt.stop_idx_of(&S::D).idx()));
+
+    // Boundary: dep == hi is excluded (upper bound is exclusive).
+    // Window [300, 350): T3 has A=300 (hits lo, included) and B=310 (in window),
+    // so A and B are marked. T6's C=350 hits hi exactly and is excluded; T5's
+    // C=250 is below lo. Hence C and D must NOT be marked.
+    let mut marked5 = FixedBitSet::with_capacity(tt.n_stops());
+    newly_active_stops_into(&tt, SecondOfDay(300), SecondOfDay(350), &mut marked5);
+    assert!(marked5.contains(tt.stop_idx_of(&S::A).idx()));
+    assert!(marked5.contains(tt.stop_idx_of(&S::B).idx()));
+    assert!(!marked5.contains(tt.stop_idx_of(&S::C).idx()));
+    assert!(!marked5.contains(tt.stop_idx_of(&S::D).idx()));
+
+    // Preserves existing bits: pre-set A, then call with an empty window so
+    // the helper performs no work. The pre-existing bit must still be set
+    // afterwards (the helper only ever calls `insert`, never clears).
+    let mut marked6 = FixedBitSet::with_capacity(tt.n_stops());
+    marked6.insert(tt.stop_idx_of(&S::A).idx());
+    newly_active_stops_into(&tt, SecondOfDay(500), SecondOfDay(500), &mut marked6);
+    assert!(marked6.contains(tt.stop_idx_of(&S::A).idx()));
 }

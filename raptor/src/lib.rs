@@ -1218,7 +1218,8 @@ fn newly_active_stops_into<T: Timetable + ?Sized>(
     if lo >= hi {
         return;
     }
-    for r in 0..tt.n_routes() as u32 {
+    let n_routes = tt.n_routes() as u32;
+    for r in 0..n_routes {
         let route = RouteIdx::new(r);
         let stops = tt.get_stops_after(route, 0);
         for (pos_offset, &stop) in stops.iter().enumerate() {
