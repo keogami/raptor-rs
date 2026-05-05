@@ -3,8 +3,8 @@ use vulture::manual::builders;
 
 #[derive(Parser)]
 #[command(
-    name = "raptor-dotgraph",
-    about = "Generate DOT graphs of synthetic transit networks"
+    name = "vulture-dotgraph",
+    about = "Render the bench-harness synthetic transit networks as Graphviz DOT"
 )]
 struct Cli {
     #[command(subcommand)]
