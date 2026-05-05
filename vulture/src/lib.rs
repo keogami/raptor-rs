@@ -100,6 +100,11 @@
 //! [`manual::SimpleTimetable`] is a hand-rolled in-memory adapter useful for
 //! tests and small fixtures.
 //!
+//! For an issue-by-issue walk through the algorithmic correctness of the
+//! implementation against the paper, see
+//! [`docs/soundness.md`](https://github.com/urschrei/vulture/blob/main/docs/soundness.md)
+//! in the repository.
+//!
 //! # Errors
 //!
 //! The library uses three patterns, picked per-call to match what the

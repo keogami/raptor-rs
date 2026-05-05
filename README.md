@@ -172,6 +172,10 @@ Single-query latency, warm `RaptorCache`, M-series Apple Silicon, single thread.
 
 For range-query latencies (serial rRAPTOR vs parallel naïve batch), see the [bench source](vulture/benches/gtfs.rs) and the linked benchmark page.
 
+## Soundness
+
+For an issue-by-issue walk through the algorithmic correctness of the implementation against the paper — including the historical record of bugs found and fixed — see [`docs/soundness.md`](docs/soundness.md). The [`vulture-proptest`](vulture-proptest/) harness runs the algorithm against a brute-force reference solver on every test invocation as live validation.
+
 ## Cargo features
 
 - `parallel` (default-on) — pulls in `rayon`, enables `Query::run_par` / `Query::run_with_pool`. Opt out with `default-features = false` for wasm or minimal builds; `RaptorCachePool` itself stays available.
