@@ -1427,7 +1427,6 @@ fn run_raptor_rounds<T: Timetable + ?Sized, L: Label>(
 /// `get_departure_time` if the lookup hits — overall
 /// O(n_routes × max_route_len) calls per invocation, each O(log
 /// n_trips_per_route) inside the trait impl.
-#[allow(dead_code)] // wired up in Task 4 of the rRAPTOR rollout
 fn newly_active_stops_into<T: Timetable + ?Sized>(
     tt: &T,
     lo: SecondOfDay,
@@ -1803,6 +1802,107 @@ fn filter_range_pareto_front<L: Label>(mut all: Vec<RangeJourney<L>>) -> Vec<Ran
         front.push(r);
     }
     front
+}
+
+/// Range-query algorithm specialised for `Label = ArrivalTime`. Single
+/// reverse-chronological scan that reuses labels across departure
+/// events (rRAPTOR, paper §4). For non-`ArrivalTime` labels, the
+/// parallel paths ([`Query::run_par`] / [`Query::run_with_pool`])
+/// still cover this case via the naïve batch.
+///
+/// `departures` must be sorted descending and deduped (the
+/// `.depart_in_window(...)` builder normalises this).
+#[allow(dead_code)] // wired up in Task 5 of the rRAPTOR rollout
+fn raptor_range_rrap_arrival<T: Timetable + ?Sized>(
+    tt: &T,
+    cache: &mut RaptorCache<ArrivalTime>,
+    transfers: usize,
+    departures: &[SecondOfDay],
+    origins: Endpoints,
+    targets: Endpoints,
+) -> Vec<RangeJourney<ArrivalTime>> {
+    let origins = origins.as_slice();
+    let targets = targets.as_slice();
+
+    cache.reset_for_query(transfers, tt.n_stops() as u32, tt.n_routes() as u32);
+    let RaptorCache {
+        labels,
+        best_arrival,
+        board_detail,
+        marked_stops,
+        q_entry,
+        q_routes,
+        walked_buf,
+        origin_set,
+        relax_heap,
+        ever_reached,
+        ..
+    } = cache;
+
+    // origin_set is constant across τ scans; populate once.
+    origin_set.clear();
+    for &(source, _) in origins {
+        origin_set.insert(source.idx());
+    }
+
+    let mut output: Vec<RangeJourney<ArrivalTime>> = Vec::new();
+    let mut prev_tau: Option<SecondOfDay> = None;
+
+    for &tau in departures {
+        // (a) Seed sources at τ + walk. `LabelBag::insert` returns
+        // true iff the new label strictly improves the bag; for τ <
+        // prev_tau the new label dominates the prior one, so
+        // re-seeding tightens the source bag. For the first scan
+        // there's nothing to dominate and the seed is added directly.
+        marked_stops.clear();
+        for &(source, walk) in origins {
+            let seed = ArrivalTime(tau + walk);
+            if labels[0][source.idx()].insert(seed) {
+                best_arrival[source.idx()].insert(seed);
+                marked_stops.insert(source.idx());
+                ever_reached.insert(source.idx());
+            }
+        }
+
+        // (b) Mark stops with newly-catchable trips for this τ. The
+        // window is half-open `[tau, prev_tau)` — trips departing at
+        // exactly `tau` are first-catchable in this scan, while trips
+        // at `prev_tau` were already covered by the previous scan.
+        if let Some(prev) = prev_tau {
+            newly_active_stops_into(tt, tau, prev, marked_stops);
+        }
+
+        // (c) Round-0 footpath relax + rounds 1..=transfers, sharing
+        // labels with previous scans.
+        run_raptor_rounds(
+            tt,
+            labels,
+            best_arrival,
+            board_detail,
+            marked_stops,
+            q_entry,
+            q_routes,
+            walked_buf,
+            relax_heap,
+            ever_reached,
+            transfers,
+            targets,
+        );
+
+        // (d) Snapshot per-target journeys for this τ.
+        let snapshot =
+            extract_target_journeys(labels, board_detail, origin_set, targets, transfers);
+        for journey in snapshot {
+            output.push(RangeJourney {
+                depart: tau,
+                journey,
+            });
+        }
+
+        prev_tau = Some(tau);
+    }
+
+    filter_range_pareto_front(output)
 }
 
 /// One entry in a range-query profile: a departure time paired with
