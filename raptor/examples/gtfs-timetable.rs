@@ -3,8 +3,9 @@
 use gtfs_structures::Gtfs;
 use humantime::format_duration;
 use jiff::civil::Date;
-use raptor::{Journey, Timetable, gtfs::GtfsTimetable};
-use std::{env, time::Duration};
+use raptor::{Duration, Journey, Timetable, gtfs::GtfsTimetable};
+use std::env;
+use std::time::Duration as StdDuration;
 
 fn main() -> anyhow::Result<()> {
     env_logger::Builder::from_env(
@@ -37,7 +38,12 @@ fn main() -> anyhow::Result<()> {
         .ok_or_else(|| anyhow::anyhow!("unknown target stop: {target}"))?;
 
     let departure_time = 19 * 3600 + 15 * 60;
-    let journeys = timetable.raptor(10, departure_time, &[(start_idx, 0)], &[(target_idx, 0)]);
+    let journeys = timetable.raptor(
+        10,
+        departure_time,
+        &[(start_idx, Duration::ZERO)],
+        &[(target_idx, Duration::ZERO)],
+    );
 
     if journeys.is_empty() {
         println!("No journeys found.");
@@ -45,7 +51,7 @@ fn main() -> anyhow::Result<()> {
     }
 
     for (i, journey) in journeys.iter().enumerate() {
-        let travel_time = Duration::from_secs((journey.arrival() - departure_time) as u64);
+        let travel_time = StdDuration::from_secs((journey.arrival() - departure_time).into());
         println!("Journey {} ({}):", i + 1, format_duration(travel_time));
         print_journey(&gtfs, &timetable, journey, start);
         println!();

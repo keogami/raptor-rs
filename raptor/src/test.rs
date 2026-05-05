@@ -1,3 +1,4 @@
+use crate::Duration;
 use crate::RaptorCache;
 use crate::Timetable;
 use crate::simple::SimpleTimetable;
@@ -53,7 +54,12 @@ fn reboarding_picks_correct_boarding_stop() {
             ],
         );
 
-    let journeys = tt.raptor(3, 0, &[(tt.stop_idx_of(&S), 0)], &[(tt.stop_idx_of(&D), 0)]);
+    let journeys = tt.raptor(
+        3,
+        0,
+        &[(tt.stop_idx_of(&S), Duration::ZERO)],
+        &[(tt.stop_idx_of(&D), Duration::ZERO)],
+    );
 
     // The optimal journey: S->B via R2, then B->D via R3/Early, arriving at t=50
     assert!(!journeys.is_empty(), "should find at least one journey");
@@ -100,8 +106,8 @@ fn no_journey_disconnected_graph() {
     let journeys = tt.raptor(
         3,
         0,
-        &[(tt.stop_idx_of(&Stop::A), 0)],
-        &[(tt.stop_idx_of(&Stop::D), 0)],
+        &[(tt.stop_idx_of(&Stop::A), Duration::ZERO)],
+        &[(tt.stop_idx_of(&Stop::D), Duration::ZERO)],
     );
     assert!(
         journeys.is_empty(),
@@ -143,8 +149,8 @@ fn no_journey_missed_connection() {
     let journeys = tt.raptor(
         3,
         0,
-        &[(tt.stop_idx_of(&Stop::A), 0)],
-        &[(tt.stop_idx_of(&Stop::C), 0)],
+        &[(tt.stop_idx_of(&Stop::A), Duration::ZERO)],
+        &[(tt.stop_idx_of(&Stop::C), Duration::ZERO)],
     );
     assert!(
         journeys.is_empty(),
@@ -177,8 +183,8 @@ fn no_journey_late_departure() {
     let journeys = tt.raptor(
         3,
         100,
-        &[(tt.stop_idx_of(&Stop::A), 0)],
-        &[(tt.stop_idx_of(&Stop::B), 0)],
+        &[(tt.stop_idx_of(&Stop::A), Duration::ZERO)],
+        &[(tt.stop_idx_of(&Stop::B), Duration::ZERO)],
     );
     assert!(
         journeys.is_empty(),
@@ -211,8 +217,8 @@ fn no_journey_transfers_zero() {
     let journeys = tt.raptor(
         0,
         0,
-        &[(tt.stop_idx_of(&Stop::A), 0)],
-        &[(tt.stop_idx_of(&Stop::B), 0)],
+        &[(tt.stop_idx_of(&Stop::A), Duration::ZERO)],
+        &[(tt.stop_idx_of(&Stop::B), Duration::ZERO)],
     );
     assert!(journeys.is_empty(), "transfers=0 should yield no journeys");
 }
@@ -242,8 +248,8 @@ fn source_equals_target() {
     let journeys = tt.raptor(
         3,
         0,
-        &[(tt.stop_idx_of(&Stop::A), 0)],
-        &[(tt.stop_idx_of(&Stop::A), 0)],
+        &[(tt.stop_idx_of(&Stop::A), Duration::ZERO)],
+        &[(tt.stop_idx_of(&Stop::A), Duration::ZERO)],
     );
     assert!(
         journeys.is_empty(),
@@ -277,8 +283,8 @@ fn direct_journey_single_route() {
     let journeys = tt.raptor(
         3,
         0,
-        &[(tt.stop_idx_of(&Stop::A), 0)],
-        &[(tt.stop_idx_of(&Stop::C), 0)],
+        &[(tt.stop_idx_of(&Stop::A), Duration::ZERO)],
+        &[(tt.stop_idx_of(&Stop::C), Duration::ZERO)],
     );
     assert_eq!(journeys.len(), 1);
     assert_eq!(journeys[0].arrival(), 20);
@@ -318,8 +324,8 @@ fn direct_journey_picks_fastest_route() {
     let journeys = tt.raptor(
         3,
         0,
-        &[(tt.stop_idx_of(&Stop::A), 0)],
-        &[(tt.stop_idx_of(&Stop::B), 0)],
+        &[(tt.stop_idx_of(&Stop::A), Duration::ZERO)],
+        &[(tt.stop_idx_of(&Stop::B), Duration::ZERO)],
     );
     let best = journeys.iter().min_by_key(|j| j.arrival()).unwrap();
     assert_eq!(best.arrival(), 50);
@@ -359,8 +365,8 @@ fn exact_time_connection() {
     let journeys = tt.raptor(
         3,
         0,
-        &[(tt.stop_idx_of(&Stop::A), 0)],
-        &[(tt.stop_idx_of(&Stop::C), 0)],
+        &[(tt.stop_idx_of(&Stop::A), Duration::ZERO)],
+        &[(tt.stop_idx_of(&Stop::C), Duration::ZERO)],
     );
     assert!(!journeys.is_empty(), "exact-time connection should work");
     let best = journeys.iter().min_by_key(|j| j.arrival()).unwrap();
@@ -403,8 +409,8 @@ fn multi_trip_picks_earliest_catchable() {
     let journeys = tt.raptor(
         3,
         12,
-        &[(tt.stop_idx_of(&Stop::A), 0)],
-        &[(tt.stop_idx_of(&Stop::B), 0)],
+        &[(tt.stop_idx_of(&Stop::A), Duration::ZERO)],
+        &[(tt.stop_idx_of(&Stop::B), Duration::ZERO)],
     );
     assert_eq!(journeys.len(), 1);
     assert_eq!(journeys[0].arrival(), 25); // T2 arrives B@25
@@ -452,8 +458,8 @@ fn two_transfer_journey() {
     let journeys = tt.raptor(
         3,
         0,
-        &[(tt.stop_idx_of(&Stop::A), 0)],
-        &[(tt.stop_idx_of(&Stop::D), 0)],
+        &[(tt.stop_idx_of(&Stop::A), Duration::ZERO)],
+        &[(tt.stop_idx_of(&Stop::D), Duration::ZERO)],
     );
     assert!(!journeys.is_empty());
     let best = journeys.iter().min_by_key(|j| j.arrival()).unwrap();
@@ -511,8 +517,8 @@ fn pareto_optimal_fewer_transfers_vs_faster() {
     let journeys = tt.raptor(
         3,
         0,
-        &[(tt.stop_idx_of(&Stop::A), 0)],
-        &[(tt.stop_idx_of(&Stop::D), 0)],
+        &[(tt.stop_idx_of(&Stop::A), Duration::ZERO)],
+        &[(tt.stop_idx_of(&Stop::D), Duration::ZERO)],
     );
     assert_eq!(journeys.len(), 2, "should have 2 pareto-optimal journeys");
 
@@ -558,7 +564,7 @@ fn footpath_enables_connection() {
             &[(Trip::T2, &[(0, 20), (30, 30)])],
         )
         .footpath(Stop::B, Stop::C)
-        .transfer_time(Stop::B, Stop::C, 5);
+        .transfer_time(Stop::B, Stop::C, Duration(5));
 
     // Optimal: board R1 at A, alight at B (arr 10), walk B→C (arr 15),
     // board R2 at C (dep 20), alight at D (arr 30). Two boardings, with a
@@ -566,8 +572,8 @@ fn footpath_enables_connection() {
     let journeys = tt.raptor(
         3,
         0,
-        &[(tt.stop_idx_of(&Stop::A), 0)],
-        &[(tt.stop_idx_of(&Stop::D), 0)],
+        &[(tt.stop_idx_of(&Stop::A), Duration::ZERO)],
+        &[(tt.stop_idx_of(&Stop::D), Duration::ZERO)],
     );
     assert_eq!(journeys.len(), 1, "expected one journey, got {journeys:?}");
     assert_eq!(journeys[0].arrival(), 30);
@@ -609,13 +615,13 @@ fn footpath_transfer_time_causes_miss() {
             &[(Trip::T2, &[(0, 52), (60, 60)])],
         )
         .footpath(Stop::B, Stop::C)
-        .transfer_time(Stop::B, Stop::C, 5); // 50+5=55 > 52
+        .transfer_time(Stop::B, Stop::C, Duration(5)); // 50+5=55 > 52
 
     let journeys = tt.raptor(
         3,
         0,
-        &[(tt.stop_idx_of(&Stop::A), 0)],
-        &[(tt.stop_idx_of(&Stop::D), 0)],
+        &[(tt.stop_idx_of(&Stop::A), Duration::ZERO)],
+        &[(tt.stop_idx_of(&Stop::D), Duration::ZERO)],
     );
     assert!(
         journeys.is_empty(),
@@ -648,14 +654,14 @@ fn early_termination_no_improvement() {
     let j1 = tt.raptor(
         1,
         0,
-        &[(tt.stop_idx_of(&Stop::A), 0)],
-        &[(tt.stop_idx_of(&Stop::B), 0)],
+        &[(tt.stop_idx_of(&Stop::A), Duration::ZERO)],
+        &[(tt.stop_idx_of(&Stop::B), Duration::ZERO)],
     );
     let j100 = tt.raptor(
         100,
         0,
-        &[(tt.stop_idx_of(&Stop::A), 0)],
-        &[(tt.stop_idx_of(&Stop::B), 0)],
+        &[(tt.stop_idx_of(&Stop::A), Duration::ZERO)],
+        &[(tt.stop_idx_of(&Stop::B), Duration::ZERO)],
     );
 
     assert_eq!(j1.len(), j100.len());
@@ -698,8 +704,8 @@ fn dominance_prunes_slower_arrival() {
     let journeys = tt.raptor(
         3,
         0,
-        &[(tt.stop_idx_of(&Stop::A), 0)],
-        &[(tt.stop_idx_of(&Stop::B), 0)],
+        &[(tt.stop_idx_of(&Stop::A), Duration::ZERO)],
+        &[(tt.stop_idx_of(&Stop::B), Duration::ZERO)],
     );
     // Both routes are discovered in round 1, so the slower one is dominated
     assert_eq!(journeys.len(), 1, "dominated journey should be pruned");
@@ -750,9 +756,19 @@ fn raptor_with_cache_matches_fresh_run() {
     for &(transfers, tau, ps, pt) in &queries {
         let ps_idx = tt.stop_idx_of(&ps);
         let pt_idx = tt.stop_idx_of(&pt);
-        let baseline = tt.raptor(transfers, tau, &[(ps_idx, 0)], &[(pt_idx, 0)]);
-        let cached =
-            tt.raptor_with_cache(&mut cache, transfers, tau, &[(ps_idx, 0)], &[(pt_idx, 0)]);
+        let baseline = tt.raptor(
+            transfers,
+            tau,
+            &[(ps_idx, Duration::ZERO)],
+            &[(pt_idx, Duration::ZERO)],
+        );
+        let cached = tt.raptor_with_cache(
+            &mut cache,
+            transfers,
+            tau,
+            &[(ps_idx, Duration::ZERO)],
+            &[(pt_idx, Duration::ZERO)],
+        );
         assert_eq!(
             cached.len(),
             baseline.len(),
@@ -799,7 +815,12 @@ fn multi_source_picks_best_origin() {
     let b = tt.stop_idx_of(&B);
     let c = tt.stop_idx_of(&C);
 
-    let journeys = tt.raptor(3, 0, &[(a, 0), (b, 0)], &[(c, 0)]);
+    let journeys = tt.raptor(
+        3,
+        0,
+        &[(a, Duration::ZERO), (b, Duration::ZERO)],
+        &[(c, Duration::ZERO)],
+    );
     assert_eq!(journeys.len(), 1, "one Pareto-optimal journey expected");
     assert_eq!(journeys[0].arrival(), 10);
     assert_eq!(
@@ -851,7 +872,12 @@ fn multi_source_walk_offset_changes_best_origin() {
     // about to depart; arrival at C = 40.
     // Walk 0s to B means the user reaches B at tau=0. TSlow boards at 0,
     // arrives C at 30.
-    let journeys = tt.raptor(3, 0, &[(a, 30), (b, 0)], &[(c, 0)]);
+    let journeys = tt.raptor(
+        3,
+        0,
+        &[(a, Duration(30)), (b, Duration::ZERO)],
+        &[(c, Duration::ZERO)],
+    );
     let best = journeys.iter().min_by_key(|j| j.arrival()).unwrap();
     assert_eq!(best.arrival(), 30);
     assert_eq!(
@@ -897,7 +923,12 @@ fn multi_target_walk_offset_picks_best_target() {
     let t1 = tt.stop_idx_of(&Stop::T1);
     let t2 = tt.stop_idx_of(&Stop::T2);
 
-    let journeys = tt.raptor(3, 0, &[(a, 0)], &[(t1, 30), (t2, 0)]);
+    let journeys = tt.raptor(
+        3,
+        0,
+        &[(a, Duration::ZERO)],
+        &[(t1, Duration(30)), (t2, Duration::ZERO)],
+    );
     let best = journeys.iter().min_by_key(|j| j.arrival()).unwrap();
     // best raw arrival at T1 = 10, +30 walk = 40 effective
     // best raw arrival at T2 = 25, +0 walk = 25 effective → wins
@@ -942,7 +973,7 @@ fn closed_path_dispatch_matches_dijkstra() {
         fn get_footpaths_from(&self, stop: StopIdx) -> &[StopIdx] {
             self.0.get_footpaths_from(stop)
         }
-        fn get_transfer_time(&self, from: StopIdx, to: StopIdx) -> Tau {
+        fn get_transfer_time(&self, from: StopIdx, to: StopIdx) -> Duration {
             self.0.get_transfer_time(from, to)
         }
         fn footpaths_are_transitively_closed(&self) -> bool {
@@ -974,13 +1005,13 @@ fn closed_path_dispatch_matches_dijkstra() {
         .route(R::R1, &[S::A, S::B], &[(Tr::T1, &[(0, 0), (10, 10)])])
         .route(R::R2, &[S::C, S::D], &[(Tr::T2, &[(0, 15), (25, 25)])])
         .footpath(S::B, S::C)
-        .transfer_time(S::B, S::C, 3);
+        .transfer_time(S::B, S::C, Duration(3));
 
     let a = inner.stop_idx_of(&S::A);
     let d = inner.stop_idx_of(&S::D);
 
-    let dijkstra = inner.raptor(3, 0, &[(a, 0)], &[(d, 0)]);
-    let closed = ClosedAssert(inner).raptor(3, 0, &[(a, 0)], &[(d, 0)]);
+    let dijkstra = inner.raptor(3, 0, &[(a, Duration::ZERO)], &[(d, Duration::ZERO)]);
+    let closed = ClosedAssert(inner).raptor(3, 0, &[(a, Duration::ZERO)], &[(d, Duration::ZERO)]);
 
     assert_eq!(dijkstra.len(), closed.len(), "journey count must match");
     for (a, b) in dijkstra.iter().zip(closed.iter()) {
@@ -991,6 +1022,7 @@ fn closed_path_dispatch_matches_dijkstra() {
 
 #[test]
 fn arrival_and_walk_label_tracks_accumulated_walk_time() {
+    use crate::Duration;
     use crate::RaptorCache;
     use crate::labels::ArrivalAndWalk;
 
@@ -1018,28 +1050,38 @@ fn arrival_and_walk_label_tracks_accumulated_walk_time() {
         .route(R::R1, &[S::A, S::B], &[(Tr::T1, &[(0, 0), (10, 10)])])
         .route(R::R2, &[S::C], &[(Tr::T2, &[(20, 20)])])
         .footpath(S::B, S::C)
-        .transfer_time(S::B, S::C, 7);
+        .transfer_time(S::B, S::C, Duration(7));
 
     let a = tt.stop_idx_of(&S::A);
     let c = tt.stop_idx_of(&S::C);
 
     // Default ArrivalTime path
-    let default_journeys = tt.raptor(3, 0, &[(a, 0)], &[(c, 0)]);
+    let default_journeys = tt.raptor(3, 0, &[(a, Duration::ZERO)], &[(c, Duration::ZERO)]);
     assert!(!default_journeys.is_empty());
     assert_eq!(default_journeys[0].arrival(), 17); // 10 + 7
 
     // Public ArrivalAndWalk via raptor_with_label.
-    let label_journeys: Vec<crate::Journey<ArrivalAndWalk>> =
-        tt.raptor_with_label::<ArrivalAndWalk>(3, 0, &[(a, 0)], &[(c, 0)]);
+    let label_journeys: Vec<crate::Journey<ArrivalAndWalk>> = tt
+        .raptor_with_label::<ArrivalAndWalk>(3, 0, &[(a, Duration::ZERO)], &[(c, Duration::ZERO)]);
     assert_eq!(label_journeys.len(), default_journeys.len());
     assert_eq!(label_journeys[0].arrival(), 17);
-    assert_eq!(label_journeys[0].label.walk_time, 7, "walk time tracked");
+    assert_eq!(
+        label_journeys[0].label.walk_time,
+        Duration(7),
+        "walk time tracked"
+    );
 
     // Same via raptor_with_cache_and_label (cache infers L).
     let mut cache = RaptorCache::<ArrivalAndWalk>::for_timetable(&tt);
-    let cached = tt.raptor_with_cache_and_label(&mut cache, 3, 0, &[(a, 0)], &[(c, 0)]);
+    let cached = tt.raptor_with_cache_and_label(
+        &mut cache,
+        3,
+        0,
+        &[(a, Duration::ZERO)],
+        &[(c, Duration::ZERO)],
+    );
     assert_eq!(cached.len(), 1);
-    assert_eq!(cached[0].label.walk_time, 7);
+    assert_eq!(cached[0].label.walk_time, Duration(7));
 }
 
 #[test]
@@ -1082,7 +1124,12 @@ fn raptor_range_returns_pareto_profile_across_departures() {
     let a = tt.stop_idx_of(&S::A);
     let b = tt.stop_idx_of(&S::B);
 
-    let profile = tt.raptor_range(3, [0, 5, 10, 15, 20], &[(a, 0)], &[(b, 0)]);
+    let profile = tt.raptor_range(
+        3,
+        [0, 5, 10, 15, 20],
+        &[(a, Duration::ZERO)],
+        &[(b, Duration::ZERO)],
+    );
 
     let mut points: Vec<(crate::Tau, crate::Tau)> = profile
         .iter()
@@ -1127,21 +1174,25 @@ fn arrival_and_walk_returns_pareto_front() {
         .route(R::R1, &[S::A, S::X], &[(Tr::T1, &[(0, 0), (10, 10)])])
         .route(R::R2, &[S::A, S::Y], &[(Tr::T2, &[(0, 0), (20, 20)])])
         .footpath(S::X, S::T)
-        .transfer_time(S::X, S::T, 5)
+        .transfer_time(S::X, S::T, Duration(5))
         .footpath(S::Y, S::T)
-        .transfer_time(S::Y, S::T, 1);
+        .transfer_time(S::Y, S::T, Duration(1));
 
     let a = tt.stop_idx_of(&S::A);
     let t = tt.stop_idx_of(&S::T);
 
     // ArrivalTime: only the arrival-min path survives.
-    let arrival_only = tt.raptor(3, 0, &[(a, 0)], &[(t, 0)]);
+    let arrival_only = tt.raptor(3, 0, &[(a, Duration::ZERO)], &[(t, Duration::ZERO)]);
     assert_eq!(arrival_only.len(), 1);
     assert_eq!(arrival_only[0].arrival(), 15);
 
     // ArrivalAndWalk: both Pareto-incomparable journeys are returned.
-    let pareto: Vec<crate::Journey<ArrivalAndWalk>> =
-        tt.raptor_with_label::<ArrivalAndWalk>(3, 0, &[(a, 0)], &[(t, 0)]);
+    let pareto: Vec<crate::Journey<ArrivalAndWalk>> = tt.raptor_with_label::<ArrivalAndWalk>(
+        3,
+        0,
+        &[(a, Duration::ZERO)],
+        &[(t, Duration::ZERO)],
+    );
     assert_eq!(
         pareto.len(),
         2,
@@ -1152,9 +1203,9 @@ fn arrival_and_walk_returns_pareto_front() {
     let mut labels: Vec<_> = pareto.iter().map(|j| j.label).collect();
     labels.sort_by_key(|l| l.arrival);
     assert_eq!(labels[0].arrival, 15);
-    assert_eq!(labels[0].walk_time, 5);
+    assert_eq!(labels[0].walk_time, Duration(5));
     assert_eq!(labels[1].arrival, 21);
-    assert_eq!(labels[1].walk_time, 1);
+    assert_eq!(labels[1].walk_time, Duration(1));
 }
 
 #[test]
@@ -1197,7 +1248,7 @@ fn with_timing_recovers_per_leg_trip_and_times() {
     let b = tt.stop_idx_of(&S::B);
     let c = tt.stop_idx_of(&S::C);
 
-    let journeys = tt.raptor(3, 0, &[(a, 0)], &[(c, 0)]);
+    let journeys = tt.raptor(3, 0, &[(a, Duration::ZERO)], &[(c, Duration::ZERO)]);
     assert_eq!(journeys.len(), 1);
     let j = &journeys[0];
     assert_eq!(j.arrival(), 25);
@@ -1252,14 +1303,14 @@ fn with_timing_handles_one_hop_walking_transfer() {
         .route(R::R1, &[S::A, S::B], &[(Tr::T1, &[(0, 0), (10, 10)])])
         .route(R::R2, &[S::C, S::D], &[(Tr::T2, &[(20, 20), (30, 30)])])
         .footpath(S::B, S::C)
-        .transfer_time(S::B, S::C, 5);
+        .transfer_time(S::B, S::C, Duration(5));
 
     let a = tt.stop_idx_of(&S::A);
     let b = tt.stop_idx_of(&S::B);
     let c = tt.stop_idx_of(&S::C);
     let d = tt.stop_idx_of(&S::D);
 
-    let journeys = tt.raptor(3, 0, &[(a, 0)], &[(d, 0)]);
+    let journeys = tt.raptor(3, 0, &[(a, Duration::ZERO)], &[(d, Duration::ZERO)]);
     assert_eq!(journeys.len(), 1);
     let j = &journeys[0];
 

@@ -6,7 +6,7 @@ use std::collections::HashMap;
 use std::fmt::Debug;
 use std::hash::Hash;
 
-use crate::{RouteIdx, StopIdx, Tau, Timetable, TripIdx};
+use crate::{Duration, RouteIdx, StopIdx, Tau, Timetable, TripIdx};
 
 /// A generic in-memory timetable backed by interning tables and dense `Vec`s.
 ///
@@ -37,7 +37,7 @@ where
     /// StopIdx -> reachable stops via footpath.
     footpaths: Vec<Vec<StopIdx>>,
     /// (from, to) -> transfer time.
-    transfer_times: HashMap<(StopIdx, StopIdx), Tau>,
+    transfer_times: HashMap<(StopIdx, StopIdx), Duration>,
     /// StopIdx -> routes serving the stop (computed incrementally).
     /// For each stop, the routes serving it paired with the *earliest*
     /// position of the stop on that route. Each route appears at most
@@ -159,7 +159,7 @@ where
     }
 
     /// Sets the transfer time for a footpath.
-    pub fn transfer_time(mut self, from: S, to: S, time: Tau) -> Self {
+    pub fn transfer_time(mut self, from: S, to: S, time: Duration) -> Self {
         let from_idx = self.intern_stop(from);
         let to_idx = self.intern_stop(to);
         self.transfer_times.insert((from_idx, to_idx), time);
@@ -255,8 +255,11 @@ where
         self.footpaths[stop.idx()].as_slice()
     }
 
-    fn get_transfer_time(&self, from: StopIdx, to: StopIdx) -> Tau {
-        self.transfer_times.get(&(from, to)).copied().unwrap_or(1)
+    fn get_transfer_time(&self, from: StopIdx, to: StopIdx) -> Duration {
+        self.transfer_times
+            .get(&(from, to))
+            .copied()
+            .unwrap_or(Duration(1))
     }
 }
 
@@ -330,7 +333,7 @@ where
                     .transfer_times
                     .get(&(from_typed, to))
                     .copied()
-                    .unwrap_or(1);
+                    .unwrap_or(Duration(1));
                 graph.add_edge(
                     Edge::new(
                         &format!("s{from_key}"),

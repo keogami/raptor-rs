@@ -26,7 +26,7 @@ use jiff::civil::Date;
 use rstar::{AABB, PointDistance, RTree, RTreeObject};
 use smallvec::SmallVec;
 
-use crate::{RouteIdx, StopIdx, Tau, Timetable, TripIdx};
+use crate::{Duration, RouteIdx, StopIdx, Tau, Timetable, TripIdx};
 
 /// Mean Earth radius in metres, used to project stop coordinates to a
 /// local Cartesian frame for the `with_walking_footpaths` spatial query.
@@ -97,7 +97,7 @@ fn jiff_to_chrono(d: Date) -> NaiveDate {
 
 const TYPICAL_ROUTES_PER_STOP: usize = 8;
 const TYPICAL_TRANSFERS_PER_STOP: usize = 4;
-const DEFAULT_TRANSFER_TIME_SECONDS: usize = 300;
+const DEFAULT_TRANSFER_TIME: Duration = Duration(300);
 
 /// Errors that can occur when constructing a [`GtfsTimetable`].
 #[derive(thiserror::Error, Debug)]
@@ -157,7 +157,7 @@ pub struct GtfsTimetable<'gtfs> {
     route_for_trip: Vec<(RouteIdx, usize)>,
 
     footpaths_for_stops: Vec<SmallVec<[StopIdx; TYPICAL_TRANSFERS_PER_STOP]>>,
-    transfer_times: HashMap<(StopIdx, StopIdx), Tau>,
+    transfer_times: HashMap<(StopIdx, StopIdx), Duration>,
 
     /// User-asserted closure flag. Returned from
     /// [`Timetable::footpaths_are_transitively_closed`] so the algorithm
@@ -170,7 +170,7 @@ pub struct GtfsTimetable<'gtfs> {
     /// For each parent-station GTFS id, the child platform `StopIdx`es
     /// (each paired with a default zero walk time, ready to pass to
     /// [`Timetable::raptor`] as a multi-source/multi-target query).
-    station_children: HashMap<&'gtfs str, Vec<(StopIdx, Tau)>>,
+    station_children: HashMap<&'gtfs str, Vec<(StopIdx, Duration)>>,
 }
 
 impl<'gtfs> GtfsTimetable<'gtfs> {
@@ -294,10 +294,10 @@ impl<'gtfs> GtfsTimetable<'gtfs> {
                     let trip = gtfs.get_trip(trip_id).expect("validated above");
                     for (stop_pos, st) in trip.stop_times.iter().enumerate() {
                         if let Some(a) = st.arrival_time {
-                            arr_table[stop_pos][trip_pos] = a as Tau;
+                            arr_table[stop_pos][trip_pos] = a;
                         }
                         let d = st.departure_time.expect("validated at construction");
-                        dep_table[stop_pos][trip_pos] = d as Tau;
+                        dep_table[stop_pos][trip_pos] = d;
                     }
                 }
                 arrival_times.push(arr_table);
@@ -321,7 +321,7 @@ impl<'gtfs> GtfsTimetable<'gtfs> {
         // 4. Footpaths and transfer times.
         let mut footpaths_for_stops: Vec<SmallVec<[StopIdx; TYPICAL_TRANSFERS_PER_STOP]>> =
             vec![SmallVec::new(); stop_ids.len()];
-        let mut transfer_times: HashMap<(StopIdx, StopIdx), Tau> = HashMap::new();
+        let mut transfer_times: HashMap<(StopIdx, StopIdx), Duration> = HashMap::new();
         for (stop_id, stop) in &gtfs.stops {
             if stop.transfers.is_empty() {
                 continue;
@@ -333,14 +333,14 @@ impl<'gtfs> GtfsTimetable<'gtfs> {
                 };
                 footpaths_for_stops[from_idx.idx()].push(to_idx);
                 if let Some(min) = t.min_transfer_time {
-                    transfer_times.insert((from_idx, to_idx), min as Tau);
+                    transfer_times.insert((from_idx, to_idx), Duration(min));
                 }
             }
         }
 
         // 5. Group child stops by their parent_station, so that callers
         //    can later query "all platforms of station X" with one lookup.
-        let mut station_children: HashMap<&'gtfs str, Vec<(StopIdx, Tau)>> = HashMap::new();
+        let mut station_children: HashMap<&'gtfs str, Vec<(StopIdx, Duration)>> = HashMap::new();
         for (stop_id, stop) in &gtfs.stops {
             if let Some(parent) = stop.parent_station.as_deref()
                 && let Some(&child_idx) = stop_by_id.get(stop_id.as_str())
@@ -351,7 +351,7 @@ impl<'gtfs> GtfsTimetable<'gtfs> {
                     station_children
                         .entry(parent_key.as_str())
                         .or_default()
-                        .push((child_idx, 0));
+                        .push((child_idx, Duration::ZERO));
                 }
             }
         }
@@ -405,7 +405,7 @@ impl<'gtfs> GtfsTimetable<'gtfs> {
     /// defaults to 0 (the user is willing to use any platform without
     /// further wait). Returns an empty slice if `parent_id` is not the
     /// GTFS id of a parent station, or if the station has no children.
-    pub fn station_stops(&self, parent_id: &str) -> &[(StopIdx, Tau)] {
+    pub fn station_stops(&self, parent_id: &str) -> &[(StopIdx, Duration)] {
         self.station_children
             .get(parent_id)
             .map(|v| v.as_slice())
@@ -481,7 +481,7 @@ impl<'gtfs> GtfsTimetable<'gtfs> {
                 let dx = from.pos[0] - near.pos[0];
                 let dy = from.pos[1] - near.pos[1];
                 let dist_m = (dx * dx + dy * dy).sqrt();
-                let walk_time = (dist_m / walking_speed_m_per_s).ceil() as Tau;
+                let walk_time = Duration((dist_m / walking_speed_m_per_s).ceil() as u32);
 
                 self.footpaths_for_stops[from.idx.idx()].push(near.idx);
                 self.transfer_times.insert((from.idx, near.idx), walk_time);
@@ -633,11 +633,11 @@ impl<'gtfs> Timetable for GtfsTimetable<'gtfs> {
         self.footpaths_for_stops[stop.idx()].as_slice()
     }
 
-    fn get_transfer_time(&self, from: StopIdx, to: StopIdx) -> Tau {
+    fn get_transfer_time(&self, from: StopIdx, to: StopIdx) -> Duration {
         self.transfer_times
             .get(&(from, to))
             .copied()
-            .unwrap_or(DEFAULT_TRANSFER_TIME_SECONDS)
+            .unwrap_or(DEFAULT_TRANSFER_TIME)
     }
 
     fn footpaths_are_transitively_closed(&self) -> bool {

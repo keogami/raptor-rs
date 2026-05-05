@@ -51,7 +51,7 @@ pub fn raptor_front(journeys: &[Journey]) -> BTreeSet<(u16, u8)> {
 }
 
 #[cfg(test)]
-use raptor::Timetable;
+use raptor::{Duration, Timetable};
 
 #[cfg(test)]
 fn run_property(tc: &hegel::TestCase, spec: &spec::NetworkSpec) {
@@ -60,9 +60,9 @@ fn run_property(tc: &hegel::TestCase, spec: &spec::NetworkSpec) {
     let pt_idx = timetable.stop_idx_of(&spec.query.pt);
     let ours = timetable.raptor(
         spec.query.max_transfers as usize,
-        spec.query.tau as usize,
-        &[(ps_idx, 0)],
-        &[(pt_idx, 0)],
+        spec.query.tau as u32,
+        &[(ps_idx, Duration::ZERO)],
+        &[(pt_idx, Duration::ZERO)],
     );
     let theirs = reference::reference_solve(
         spec,
@@ -104,7 +104,7 @@ mod tests {
     use super::*;
     use raptor::{ArrivalTime, Journey, RouteIdx, StopIdx};
 
-    fn j(arrival: usize, plan: Vec<(u32, u32)>) -> Journey {
+    fn j(arrival: u32, plan: Vec<(u32, u32)>) -> Journey {
         Journey {
             origin: StopIdx::new(0),
             target: StopIdx::new(0),

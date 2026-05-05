@@ -273,10 +273,10 @@ fn main() -> anyhow::Result<()> {
 fn resolve_endpoint(
     tt: &GtfsTimetable,
     e: &Endpoint,
-) -> Result<Vec<(raptor::StopIdx, Tau)>, String> {
+) -> Result<Vec<(raptor::StopIdx, raptor::Duration)>, String> {
     match *e {
         Endpoint::Stop(id) => match tt.stop_idx(id) {
-            Some(idx) => Ok(vec![(idx, 0)]),
+            Some(idx) => Ok(vec![(idx, raptor::Duration::ZERO)]),
             None => Err(format!("unknown stop `{id}`")),
         },
         Endpoint::Station(id) => {

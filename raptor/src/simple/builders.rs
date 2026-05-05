@@ -5,12 +5,12 @@ type Tt = SimpleTimetable<usize, usize, usize>;
 /// Single route with `stops` stops and `trips` trips.
 pub fn build_linear(stops: usize, trips: usize) -> Tt {
     let stop_ids: Vec<usize> = (0..stops).collect();
-    let trip_defs: Vec<(usize, Vec<(usize, usize)>)> = (0..trips)
+    let trip_defs: Vec<(usize, Vec<(u32, u32)>)> = (0..trips)
         .map(|t| {
-            let times: Vec<(usize, usize)> = (0..stops)
+            let times: Vec<(u32, u32)> = (0..stops)
                 .map(|s| {
                     let base = t * stops * 2;
-                    (base + s * 2, base + s * 2 + 1)
+                    ((base + s * 2) as u32, (base + s * 2 + 1) as u32)
                 })
                 .collect();
             (t, times)
@@ -18,7 +18,7 @@ pub fn build_linear(stops: usize, trips: usize) -> Tt {
         .collect();
 
     let mut tt = SimpleTimetable::new();
-    let trip_refs: Vec<(usize, &[(usize, usize)])> = trip_defs
+    let trip_refs: Vec<(usize, &[(u32, u32)])> = trip_defs
         .iter()
         .map(|(id, times)| (*id, times.as_slice()))
         .collect();
@@ -38,8 +38,9 @@ pub fn build_grid(routes: usize, stops_per_route: usize, connectors: usize) -> T
         let stop_ids: Vec<usize> = (0..stops_per_route)
             .map(|s| r * stops_per_route + s)
             .collect();
-        let times: Vec<(usize, usize)> =
-            (0..stops_per_route).map(|s| (s * 10, s * 10 + 5)).collect();
+        let times: Vec<(u32, u32)> = (0..stops_per_route)
+            .map(|s| ((s * 10) as u32, (s * 10 + 5) as u32))
+            .collect();
         tt = tt.route(route_id, &stop_ids, &[(trip_id, times.as_slice())]);
         route_id += 1;
         trip_id += 1;
@@ -50,10 +51,10 @@ pub fn build_grid(routes: usize, stops_per_route: usize, connectors: usize) -> T
     for c in 0..connectors {
         let col = c * connector_step;
         let stop_ids: Vec<usize> = (0..routes).map(|r| r * stops_per_route + col).collect();
-        let times: Vec<(usize, usize)> = (0..routes)
+        let times: Vec<(u32, u32)> = (0..routes)
             .map(|r| {
                 let base = col * 10 + r * 3;
-                (base, base + 1)
+                ((base) as u32, (base + 1) as u32)
             })
             .collect();
         tt = tt.route(route_id, &stop_ids, &[(trip_id, times.as_slice())]);
@@ -88,12 +89,12 @@ pub fn build_hub_spoke(hubs: usize, routes_per_hub: usize, spokes: usize) -> Tt 
                 stops.push(stop_id);
                 stop_id += 1;
             }
-            let times: Vec<(usize, usize)> = stops
+            let times: Vec<(u32, u32)> = stops
                 .iter()
                 .enumerate()
                 .map(|(i, _)| {
                     let base = (h * routes_per_hub + r) * (spokes + 1) * 10;
-                    (base + i * 10, base + i * 10 + 5)
+                    ((base + i * 10) as u32, (base + i * 10 + 5) as u32)
                 })
                 .collect();
             tt = tt.route(route_id, &stops, &[(trip_id, times.as_slice())]);
@@ -107,7 +108,7 @@ pub fn build_hub_spoke(hubs: usize, routes_per_hub: usize, spokes: usize) -> Tt 
         for j in 0..hubs {
             if i != j {
                 tt = tt.footpath(hub_stops[i], hub_stops[j]);
-                tt = tt.transfer_time(hub_stops[i], hub_stops[j], 2);
+                tt = tt.transfer_time(hub_stops[i], hub_stops[j], crate::Duration(2));
             }
         }
     }
@@ -129,7 +130,10 @@ pub fn build_chain(segments: usize) -> Tt {
             &[from, to],
             &[(
                 seg,
-                &[(base_time, base_time + 5), (base_time + 10, base_time + 15)],
+                &[
+                    (base_time as u32, (base_time + 5) as u32),
+                    ((base_time + 10) as u32, (base_time + 15) as u32),
+                ],
             )],
         );
     }
@@ -170,7 +174,13 @@ pub fn build_parallel_paths(path_count: usize, max_legs: usize) -> Tt {
             tt = tt.route(
                 route_id,
                 &[prev_stop, curr_stop],
-                &[(trip_id, &[(depart, depart + 1), (arrive, arrive + 1)])],
+                &[(
+                    trip_id,
+                    &[
+                        (depart as u32, (depart + 1) as u32),
+                        (arrive as u32, (arrive + 1) as u32),
+                    ],
+                )],
             );
             route_id += 1;
             trip_id += 1;

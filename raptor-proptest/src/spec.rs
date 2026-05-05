@@ -117,7 +117,7 @@ pub fn render(spec: &NetworkSpec) -> SimpleTimetable<u8, u8, u16> {
             }
             if let Some(walk) = closed[from as usize][to as usize] {
                 tt = tt.footpath(from, to);
-                tt = tt.transfer_time(from, to, walk as raptor::Tau);
+                tt = tt.transfer_time(from, to, raptor::Duration(walk as u32));
             }
         }
     }
@@ -297,7 +297,7 @@ fn render_emits_transitively_closed_footpaths() {
     let from_0: Vec<raptor::StopIdx> = tt.get_footpaths_from(s0).to_vec();
     assert!(from_0.contains(&s1), "direct A->B");
     assert!(from_0.contains(&s2), "transitive A->C must be present");
-    assert_eq!(tt.get_transfer_time(s0, s2), 7);
+    assert_eq!(tt.get_transfer_time(s0, s2), raptor::Duration(7));
 }
 
 // -------- Hegel generators ---------------------------------------------

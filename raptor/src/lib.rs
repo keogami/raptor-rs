@@ -82,11 +82,105 @@ pub mod simple;
 #[cfg(test)]
 mod test;
 
-/// The number of transfers (round number in the RAPTOR algorithm).
-pub type K = usize;
+/// Internal round-counter type, used only for indexing label arrays.
+/// User-facing transfer caps are passed as [`Transfers`].
+pub(crate) type K = usize;
 
-/// Time value in seconds since midnight.
-pub type Tau = usize;
+/// A point in time, in seconds since midnight on the timetable's
+/// service date. Type-aliased to `u32` (the day is 86,400 seconds;
+/// `u32` covers feed quirks like trips encoded past 24h with room
+/// to spare).
+///
+/// Tau is a *timestamp*. A *length* of time — walk-time offset,
+/// transfer time, dwell time — is a [`Duration`], a distinct type.
+/// The trait surface uses both consistently so they can't be
+/// silently confused.
+pub type Tau = u32;
+
+/// A length of time, in seconds. Distinct from [`Tau`] (a point in
+/// time) so the algorithm signatures can express which kind they
+/// expect: a walk-time offset, a transfer time, and a dwell time
+/// are all `Duration`; an arrival time and a departure time are
+/// both `Tau`.
+///
+/// Constructed via [`Duration::ZERO`], [`Duration::from_secs`], or
+/// the public-field constructor `Duration(n)`. Arithmetic is
+/// saturating: `Duration::MAX + Duration` stays at `Duration::MAX`.
+#[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Default)]
+pub struct Duration(pub u32);
+
+impl Duration {
+    /// Zero seconds.
+    pub const ZERO: Duration = Duration(0);
+    /// Maximum representable duration. Used internally as the
+    /// "no walk recorded" sentinel for some algorithm paths.
+    pub const MAX: Duration = Duration(u32::MAX);
+
+    /// Construct from a raw seconds count.
+    pub const fn from_secs(s: u32) -> Self {
+        Duration(s)
+    }
+
+    /// The underlying `u32` — seconds.
+    pub const fn as_secs(self) -> u32 {
+        self.0
+    }
+}
+
+impl From<u32> for Duration {
+    fn from(s: u32) -> Self {
+        Duration(s)
+    }
+}
+
+impl fmt::Display for Duration {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        self.0.fmt(f)
+    }
+}
+
+impl std::ops::Add<Duration> for Duration {
+    type Output = Duration;
+    fn add(self, o: Duration) -> Duration {
+        Duration(self.0.saturating_add(o.0))
+    }
+}
+
+/// User-facing transfer cap. The algorithm explores rounds 0
+/// through `transfers` inclusive, so `Transfers(10)` lets a journey
+/// involve up to 10 boardings. `u8` is plenty — practical journey
+/// queries cap at single digits.
+#[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Default)]
+pub struct Transfers(pub u8);
+
+impl Transfers {
+    /// No transfers allowed (only direct journeys).
+    pub const ZERO: Transfers = Transfers(0);
+    /// Maximum representable transfer cap (255).
+    pub const MAX: Transfers = Transfers(u8::MAX);
+
+    /// Construct from a raw `u8`.
+    pub const fn new(n: u8) -> Self {
+        Transfers(n)
+    }
+
+    /// The underlying `u8`.
+    pub const fn get(self) -> u8 {
+        self.0
+    }
+}
+
+impl From<u8> for Transfers {
+    fn from(n: u8) -> Self {
+        Transfers(n)
+    }
+}
+
+impl fmt::Display for Transfers {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        self.0.fmt(f)
+    }
+}
 
 /// Dense index of a stop within a [`Timetable`]. Indices are in `0..tt.n_stops()`.
 ///
@@ -233,7 +327,7 @@ pub trait Label: Copy + std::fmt::Debug {
     fn extend_by_trip(self, arrival_tau: Tau) -> Self;
 
     /// New label after walking a footpath of duration `walk_time`.
-    fn extend_by_footpath(self, walk_time: Tau) -> Self;
+    fn extend_by_footpath(self, walk_time: Duration) -> Self;
 
     /// `self` weakly dominates `other` (every criterion of `self` is
     /// at most the corresponding criterion of `other`). The default
@@ -269,8 +363,8 @@ impl Label for ArrivalTime {
     }
 
     #[inline]
-    fn extend_by_footpath(self, walk_time: Tau) -> Self {
-        ArrivalTime(self.0.saturating_add(walk_time))
+    fn extend_by_footpath(self, walk_time: Duration) -> Self {
+        ArrivalTime(self.0.saturating_add(walk_time.0))
     }
 
     #[inline]
@@ -377,7 +471,7 @@ impl<L: Label> Journey<L> {
             let serving_here = tt.get_routes_serving_stop(current_stop);
             let (board, board_pos, walk_time) =
                 if let Some(&(_, pos)) = serving_here.iter().find(|(r, _)| *r == route) {
-                    (current_stop, pos, 0)
+                    (current_stop, pos, Duration::ZERO)
                 } else {
                     let mut found = None;
                     for &neighbour in tt.get_footpaths_from(current_stop) {
@@ -394,7 +488,7 @@ impl<L: Label> Journey<L> {
                     found?
                 };
 
-            current_time = current_time.saturating_add(walk_time);
+            current_time = current_time.saturating_add(walk_time.0);
 
             let trip = tt.get_earliest_trip(route, current_time, board_pos)?;
             let depart = tt.get_departure_time(trip, board_pos);
@@ -712,10 +806,13 @@ fn relax_footpaths_round<T: Timetable + ?Sized, L: Label>(
 /// Returns the minimum of `best_arrival[t].min_arrival() + w` across
 /// all `(t, w)` in `targets`, saturating on overflow. Returns
 /// `Tau::MAX` if every target is unreached.
-fn best_to_any_target<L: Label>(best_arrival: &[LabelBag<L>], targets: &[(StopIdx, Tau)]) -> Tau {
+fn best_to_any_target<L: Label>(
+    best_arrival: &[LabelBag<L>],
+    targets: &[(StopIdx, Duration)],
+) -> Tau {
     targets
         .iter()
-        .map(|&(t, w)| best_arrival[t.idx()].min_arrival().saturating_add(w))
+        .map(|&(t, w)| best_arrival[t.idx()].min_arrival().saturating_add(w.0))
         .min()
         .unwrap_or(Tau::MAX)
 }
@@ -869,11 +966,11 @@ pub trait Timetable {
     /// algorithm chains walks within a round. See the trait-level docs.
     fn get_footpaths_from(&self, stop: StopIdx) -> &[StopIdx];
 
-    /// Returns the walking transfer time between two stops, in seconds.
-    /// The default implementation returns `1`.
-    fn get_transfer_time(&self, from: StopIdx, to: StopIdx) -> Tau {
+    /// Returns the walking transfer time between two stops.
+    /// The default implementation returns 1 second.
+    fn get_transfer_time(&self, from: StopIdx, to: StopIdx) -> Duration {
         let (_, _) = (from, to);
-        1
+        Duration(1)
     }
 
     /// Reports whether the footpath relation is transitively closed —
@@ -916,8 +1013,8 @@ pub trait Timetable {
         &self,
         transfers: usize,
         tau: Tau,
-        origins: &[(StopIdx, Tau)],
-        targets: &[(StopIdx, Tau)],
+        origins: &[(StopIdx, Duration)],
+        targets: &[(StopIdx, Duration)],
     ) -> Vec<Journey>
     where
         Self: Sized,
@@ -934,8 +1031,8 @@ pub trait Timetable {
         &self,
         transfers: usize,
         tau: Tau,
-        origins: &[(StopIdx, Tau)],
-        targets: &[(StopIdx, Tau)],
+        origins: &[(StopIdx, Duration)],
+        targets: &[(StopIdx, Duration)],
     ) -> Vec<Journey<L>>
     where
         Self: Sized,
@@ -952,8 +1049,8 @@ pub trait Timetable {
         cache: &mut RaptorCache,
         transfers: usize,
         tau: Tau,
-        origins: &[(StopIdx, Tau)],
-        targets: &[(StopIdx, Tau)],
+        origins: &[(StopIdx, Duration)],
+        targets: &[(StopIdx, Duration)],
     ) -> Vec<Journey>
     where
         Self: Sized,
@@ -970,8 +1067,8 @@ pub trait Timetable {
         cache: &mut RaptorCache<L>,
         transfers: usize,
         tau: Tau,
-        origins: &[(StopIdx, Tau)],
-        targets: &[(StopIdx, Tau)],
+        origins: &[(StopIdx, Duration)],
+        targets: &[(StopIdx, Duration)],
     ) -> Vec<Journey<L>>
     where
         Self: Sized,
@@ -1001,7 +1098,7 @@ pub trait Timetable {
         // Reconstruction breaks the trace loop when it hits an origin
         // (origin_set bit is set), so origins don't need a Step entry.
         for &(o, walk) in origins {
-            let t = tau.saturating_add(walk);
+            let t = tau.saturating_add(walk.0);
             let seed = L::from_departure(t);
             if labels[0][o.idx()].insert(seed) {
                 best_arrival[o.idx()].insert(seed);
@@ -1288,8 +1385,8 @@ pub trait Timetable {
         &self,
         transfers: usize,
         departures: impl IntoIterator<Item = Tau>,
-        origins: &[(StopIdx, Tau)],
-        targets: &[(StopIdx, Tau)],
+        origins: &[(StopIdx, Duration)],
+        targets: &[(StopIdx, Duration)],
     ) -> Vec<RangeJourney>
     where
         Self: Sized,
@@ -1309,8 +1406,8 @@ pub trait Timetable {
         cache: &mut RaptorCache<L>,
         transfers: usize,
         departures: impl IntoIterator<Item = Tau>,
-        origins: &[(StopIdx, Tau)],
-        targets: &[(StopIdx, Tau)],
+        origins: &[(StopIdx, Duration)],
+        targets: &[(StopIdx, Duration)],
     ) -> Vec<RangeJourney<L>>
     where
         Self: Sized,

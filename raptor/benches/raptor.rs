@@ -1,4 +1,5 @@
 use criterion::{BenchmarkId, Criterion, criterion_group, criterion_main};
+use raptor::Duration;
 use raptor::Timetable;
 use raptor::simple::builders::*;
 
@@ -14,7 +15,14 @@ fn bench_linear(c: &mut Criterion) {
             |b, tt| {
                 let source = tt.stop_idx_of(&0usize);
                 let target = tt.stop_idx_of(&(stops - 1));
-                b.iter(|| tt.raptor(3, 0, &[(source, 0)], &[(target, 0)]))
+                b.iter(|| {
+                    tt.raptor(
+                        3,
+                        0,
+                        &[(source, Duration::ZERO)],
+                        &[(target, Duration::ZERO)],
+                    )
+                })
             },
         );
     }
@@ -39,7 +47,14 @@ fn bench_grid(c: &mut Criterion) {
             |b, tt| {
                 let source = tt.stop_idx_of(&source_key);
                 let target = tt.stop_idx_of(&target_key);
-                b.iter(|| tt.raptor(5, 0, &[(source, 0)], &[(target, 0)]))
+                b.iter(|| {
+                    tt.raptor(
+                        5,
+                        0,
+                        &[(source, Duration::ZERO)],
+                        &[(target, Duration::ZERO)],
+                    )
+                })
             },
         );
     }
@@ -66,7 +81,14 @@ fn bench_hub_spoke(c: &mut Criterion) {
             |b, tt| {
                 let source = tt.stop_idx_of(&source_key);
                 let target = tt.stop_idx_of(&target_key);
-                b.iter(|| tt.raptor(5, 0, &[(source, 0)], &[(target, 0)]))
+                b.iter(|| {
+                    tt.raptor(
+                        5,
+                        0,
+                        &[(source, Duration::ZERO)],
+                        &[(target, Duration::ZERO)],
+                    )
+                })
             },
         );
     }
@@ -82,7 +104,14 @@ fn bench_transfer_scaling(c: &mut Criterion) {
     let target = tt.stop_idx_of(&(4 * 20 + 19usize));
     for k in [1, 3, 5, 10, 20] {
         group.bench_with_input(BenchmarkId::new("raptor", format!("k{k}")), &k, |b, &k| {
-            b.iter(|| tt.raptor(k, 0, &[(source, 0)], &[(target, 0)]))
+            b.iter(|| {
+                tt.raptor(
+                    k,
+                    0,
+                    &[(source, Duration::ZERO)],
+                    &[(target, Duration::ZERO)],
+                )
+            })
         });
     }
     group.finish();
@@ -101,7 +130,14 @@ fn bench_reconstruction_depth(c: &mut Criterion) {
             |b, tt| {
                 let source = tt.stop_idx_of(&0usize);
                 let target = tt.stop_idx_of(&segments);
-                b.iter(|| tt.raptor(segments + 1, 0, &[(source, 0)], &[(target, 0)]))
+                b.iter(|| {
+                    tt.raptor(
+                        segments + 1,
+                        0,
+                        &[(source, Duration::ZERO)],
+                        &[(target, Duration::ZERO)],
+                    )
+                })
             },
         );
     }
@@ -121,7 +157,14 @@ fn bench_reconstruction_breadth(c: &mut Criterion) {
             |b, tt| {
                 let source = tt.stop_idx_of(&0usize);
                 let target = tt.stop_idx_of(&1usize);
-                b.iter(|| tt.raptor(max_legs + 1, 0, &[(source, 0)], &[(target, 0)]))
+                b.iter(|| {
+                    tt.raptor(
+                        max_legs + 1,
+                        0,
+                        &[(source, Duration::ZERO)],
+                        &[(target, Duration::ZERO)],
+                    )
+                })
             },
         );
     }

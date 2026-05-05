@@ -1,3 +1,4 @@
+use raptor::Duration;
 use raptor::{RouteIdx, StopIdx, Tau, Timetable, TripIdx};
 
 const R0_STOPS: [StopIdx; 10] = [
@@ -123,7 +124,12 @@ fn main() {
     .init();
 
     let mock = TwoRoutes;
-    let journey = mock.raptor(10, 0, &[(StopIdx::new(1), 0)], &[(StopIdx::new(9), 0)]);
+    let journey = mock.raptor(
+        10,
+        0,
+        &[(StopIdx::new(1), Duration::ZERO)],
+        &[(StopIdx::new(9), Duration::ZERO)],
+    );
 
     println!("{journey:#?}");
 }

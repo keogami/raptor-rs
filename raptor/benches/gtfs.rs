@@ -1,6 +1,7 @@
 use criterion::{BenchmarkId, Criterion, criterion_group, criterion_main};
 use gtfs_structures::Gtfs;
 use jiff::civil::{Date, date};
+use raptor::Duration;
 use raptor::gtfs::GtfsTimetable;
 use raptor::{RaptorCache, Timetable};
 use std::hint::black_box;
@@ -68,8 +69,8 @@ fn bench_gtfs_query(c: &mut Criterion) {
                         &mut cache,
                         10,
                         DEPARTURE_TIME,
-                        &[(start, 0)],
-                        &[(target, 0)],
+                        &[(start, Duration::ZERO)],
+                        &[(target, Duration::ZERO)],
                     );
                     black_box(&journeys);
                 });

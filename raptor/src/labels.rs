@@ -8,7 +8,7 @@
 //! Custom impls live in user code — see the [`Label`](crate::Label)
 //! trait docs for the requirements.
 
-use crate::{Label, Tau};
+use crate::{Duration, Label, Tau};
 
 /// Two-criterion label tracking arrival time *and* accumulated walking
 /// time. Trip rides preserve the boarding label's walking time;
@@ -44,20 +44,20 @@ pub struct ArrivalAndWalk {
     pub arrival: Tau,
     /// Total walking time accumulated along the path that produced
     /// this label, in seconds.
-    pub walk_time: Tau,
+    pub walk_time: Duration,
 }
 
 impl Label for ArrivalAndWalk {
     const UNREACHED: Self = ArrivalAndWalk {
         arrival: Tau::MAX,
-        walk_time: 0,
+        walk_time: Duration::ZERO,
     };
 
     #[inline]
     fn from_departure(tau: Tau) -> Self {
         ArrivalAndWalk {
             arrival: tau,
-            walk_time: 0,
+            walk_time: Duration::ZERO,
         }
     }
 
@@ -70,10 +70,10 @@ impl Label for ArrivalAndWalk {
     }
 
     #[inline]
-    fn extend_by_footpath(self, walk: Tau) -> Self {
+    fn extend_by_footpath(self, walk: Duration) -> Self {
         ArrivalAndWalk {
-            arrival: self.arrival.saturating_add(walk),
-            walk_time: self.walk_time.saturating_add(walk),
+            arrival: self.arrival.saturating_add(walk.0),
+            walk_time: self.walk_time + walk,
         }
     }
 

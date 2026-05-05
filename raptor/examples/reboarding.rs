@@ -1,6 +1,7 @@
 //! Example showing a multi-route RAPTOR query where a passenger reboards
 //! a shared route at a later stop reached via a faster feeder route.
 
+use raptor::Duration;
 use raptor::{RouteIdx, StopIdx, Tau, Timetable, TripIdx};
 
 // Stop indices: S=0, A=1, B=2, C=3, D=4
@@ -145,7 +146,7 @@ fn main() {
     println!("Expected: S --(R2)--> B --(R3/early)--> D, arrives @ t=50\n");
 
     let timetable = ReBoardingTimetable;
-    let journeys = timetable.raptor(3, 0, &[(S, 0)], &[(D, 0)]);
+    let journeys = timetable.raptor(3, 0, &[(S, Duration::ZERO)], &[(D, Duration::ZERO)]);
 
     println!("{journeys:#?}");
 }
