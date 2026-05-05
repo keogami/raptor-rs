@@ -1,3 +1,13 @@
+//! Hand-rolled in-memory [`Timetable`](crate::Timetable) for tests, fixtures,
+//! and small synthetic networks.
+//!
+//! The bundled [`SimpleTimetable`](crate::manual::SimpleTimetable) builder lets you describe a network
+//! with `.route(...)` / `.footpath(...)` / `.transfer_time(...)` calls
+//! and arbitrary key types. Production callers
+//! usually want the GTFS adapter at [`crate::gtfs::GtfsTimetable`] instead;
+//! this module shines when you want a tiny well-known network for unit
+//! tests, examples, or property-test generators.
+
 /// Benchmark timetable builders.
 #[cfg(feature = "internal")]
 pub mod builders;
@@ -8,11 +18,14 @@ use std::hash::Hash;
 
 use crate::{Duration, RouteIdx, SecondOfDay, StopIdx, Timetable, TripIdx};
 
-/// A generic in-memory timetable backed by interning tables and dense `Vec`s.
+/// A generic in-memory [`Timetable`] backed by interning tables and dense `Vec`s.
 ///
-/// Generic over key types `S`/`R`/`T` (with `Hash + Eq + Clone` bounds) so
-/// tests and benches can use ergonomic key types (enums, integers) while the
-/// internal storage is dense `u32` indices throughout.
+/// Generic over key types `S` / `R` / `T` (each `Hash + Eq + Clone`) so tests
+/// and benches can use ergonomic keys — enums, integers, strings — while the
+/// internal storage is dense `u32` indices throughout. Build with `.route(...)`
+/// and `.footpath(...)` / `.transfer_time(...)`; resolve external keys to
+/// indices via [`SimpleTimetable::stop_idx_of`] / [`SimpleTimetable::route_idx_of`]
+/// / [`SimpleTimetable::trip_idx_of`] when constructing queries.
 pub struct SimpleTimetable<S = u32, R = u32, T = u32>
 where
     S: Hash + Eq + Clone,

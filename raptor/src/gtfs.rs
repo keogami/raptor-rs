@@ -130,6 +130,45 @@ type GtfsResult<T> = std::result::Result<T, GtfsError>;
 /// interns stops/routes/trips to dense `u32` indices, splits each GTFS
 /// `route_id` into one or more [`RouteIdx`]s by stop pattern and
 /// overtaking, and builds the lookup indices the algorithm requires.
+///
+/// ```no_run
+/// use gtfs_structures::Gtfs;
+/// use jiff::civil::date;
+/// use raptor::{SecondOfDay, Timetable};
+/// use raptor::gtfs::GtfsTimetable;
+///
+/// # fn ex() -> anyhow::Result<()> {
+/// let gtfs = Gtfs::new("path/to/gtfs.zip")?;
+/// let tt = GtfsTimetable::new(&gtfs, date(2026, 5, 4))?;
+///
+/// let start = tt.stop_idx("origin_id").expect("unknown stop");
+/// let target = tt.stop_idx("target_id").expect("unknown stop");
+///
+/// let journeys = tt
+///     .query()
+///     .from(start)
+///     .to(target)
+///     .max_transfers(10)
+///     .depart_at(SecondOfDay::hms(9, 0, 0))
+///     .run();
+/// # Ok(())
+/// # }
+/// ```
+///
+/// Common follow-on calls:
+///
+/// - [`GtfsTimetable::station_stops`] — expand a parent station to its
+///   child platforms for multi-source / multi-target queries.
+/// - [`GtfsTimetable::with_walking_footpaths`] — augment a sparse or
+///   empty `transfers.txt` with coordinate-derived walking edges.
+/// - [`GtfsTimetable::assert_footpaths_closed`] — opt into the
+///   single-pass footpath relaxation when your `transfers.txt` is the
+///   entire intended walking relation.
+/// - [`GtfsTimetable::stop_id`] / [`GtfsTimetable::route_id`] — translate
+///   `StopIdx` / `RouteIdx` values back to the original GTFS IDs.
+/// - [`GtfsTimetable::routes_for_gtfs_id`] — enumerate the synthetic
+///   [`RouteIdx`]s produced from a single GTFS `route_id` (one per
+///   distinct, non-overtaking stop-pattern equivalence class).
 pub struct GtfsTimetable<'gtfs> {
     // Forward tables: idx -> &'gtfs str (original GTFS IDs).
     stop_ids: Vec<&'gtfs str>,
@@ -169,7 +208,7 @@ pub struct GtfsTimetable<'gtfs> {
 
     /// For each parent-station GTFS id, the child platform `StopIdx`es
     /// (each paired with a default zero walk time, ready to pass to
-    /// [`Timetable::raptor`] as a multi-source/multi-target query).
+    /// `Query::from` / `Query::to` as a multi-source/multi-target query).
     station_children: HashMap<&'gtfs str, Vec<(StopIdx, Duration)>>,
 }
 

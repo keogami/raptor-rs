@@ -2180,13 +2180,33 @@ where
 
 /// Reusable scratch buffers for [`Query::run_with_cache`].
 ///
-/// A `RaptorCache` is sized for a specific timetable's stop and route counts.
-/// Construct with [`RaptorCache::for_timetable`]; passing it to a query
-/// against a differently-sized timetable will panic.
+/// `Query::run` allocates a fresh cache on every call. For workloads that
+/// run many queries against the same timetable (a server, a batch job),
+/// allocate a `RaptorCache` once and pass `&mut cache` to
+/// [`Query::run_with_cache`] at the end of each builder chain — the
+/// timetable-sized buffers get reset rather than reallocated between queries.
 ///
-/// A `RaptorCache` is *not* thread-safe and must not be shared across
-/// queries running concurrently. For parallel query workloads, give each
-/// worker thread its own cache.
+/// ```no_run
+/// # use raptor::{RaptorCache, SecondOfDay, Timetable};
+/// # fn ex<T: Timetable>(tt: &T, queries: &[(raptor::StopIdx, raptor::StopIdx)]) {
+/// let mut cache = RaptorCache::for_timetable(tt);
+/// for &(start, end) in queries {
+///     let _ = tt.query()
+///         .from(start)
+///         .to(end)
+///         .depart_at(SecondOfDay::hms(9, 0, 0))
+///         .run_with_cache(&mut cache);
+/// }
+/// # }
+/// ```
+///
+/// A cache is sized for a specific timetable's `n_stops` / `n_routes`;
+/// passing it to a query against a differently-sized timetable panics on
+/// entry. Use [`RaptorCache::with_capacity`] when the timetable isn't yet in
+/// scope.
+///
+/// `RaptorCache` is `!Sync` — give each worker its own, or use
+/// [`RaptorCachePool`] (the `Sync` freelist variant).
 pub struct RaptorCache<L: Label = ArrivalTime> {
     n_stops: u32,
     n_routes: u32,
