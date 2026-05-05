@@ -93,9 +93,11 @@
 //! construction. The trait carries one mandatory soundness contract —
 //! no-overtaking within a route — documented on [`Timetable`]. Footpaths
 //! returned by [`Timetable::get_footpaths_from`] describe direct walks only;
-//! the algorithm chains them within a round, so transitive closure is not
-//! required. Adapters whose relation *is* closed can opt into a faster
-//! single-pass relaxation via [`Timetable::footpaths_are_transitively_closed`].
+//! the algorithm chains them within a round, so transitive closure of the
+//! footpath relation is not required (see the [`Timetable`] trait's
+//! Footpaths section for what closure means and when it matters).
+//! Adapters whose relation *is* closed can opt into a faster single-pass
+//! relaxation via [`Timetable::footpaths_are_transitively_closed`].
 //!
 //! [`manual::SimpleTimetable`] is a hand-rolled in-memory adapter useful for
 //! tests and small fixtures.

@@ -31,15 +31,20 @@ use crate::time::Transfers;
 ///
 /// # Footpaths
 ///
-/// The footpath relation returned by [`get_footpaths_from`] does **not**
-/// need to be transitively closed: if you can walk `A → B` and `B → C`,
-/// the algorithm will chain them within a single round, reaching `C`
-/// from `A` with the combined walk time. Footpath relaxation iterates to
-/// a fixed point per round.
+/// The footpath relation returned by [`get_footpaths_from`] is the
+/// *direct* walking edges only. A relation is *transitively closed*
+/// when every walk reachable through a chain of direct edges is
+/// already present as a single direct edge: i.e. if `A → B` and
+/// `B → C` are both in the relation, then `A → C` is too, with the
+/// combined walk time ([Wikipedia][tc]). The algorithm does **not**
+/// require closure — it chains direct walks within a single round
+/// using multi-source Dijkstra, so a non-closed relation produces
+/// correct answers; closure is purely an optimisation that lets the
+/// algorithm switch to a cheaper single-pass `O(E)` relaxation. See
+/// [`footpaths_are_transitively_closed`] for the opt-in.
 ///
-/// Closure can still be useful as an optimisation — pre-closed graphs
-/// have fewer edges to traverse — but it is not a soundness
-/// prerequisite.
+/// [tc]: https://en.wikipedia.org/wiki/Transitive_closure
+/// [`footpaths_are_transitively_closed`]: Timetable::footpaths_are_transitively_closed
 ///
 /// # No overtaking within a route
 ///

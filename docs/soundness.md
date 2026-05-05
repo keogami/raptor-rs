@@ -83,7 +83,12 @@ time** and **number of transfers** in a public transit network.
 ## Outstanding soundness issues
 
 None known. The closure-of-footpaths concern that earlier versions of
-this document carried is now addressed in two complementary ways:
+this document carried is now addressed in two complementary ways
+(*transitive closure* of the footpath relation means every walk
+reachable through a chain of direct edges is already present as a
+single direct edge — `A → B` and `B → C` implies `A → C` with the
+combined walk time; see the [`Timetable` trait docs][tt-fp] and
+[Wikipedia][tc]):
 
 - The `Timetable` trait documents the closure requirement explicitly,
   and the algorithm uses multi-source Dijkstra inside each round's
@@ -93,6 +98,9 @@ this document carried is now addressed in two complementary ways:
   transitively closed (Berlin VBB, Paris IDFM), the
   `Timetable::footpaths_are_transitively_closed` opt-in switches to
   the cheaper single-pass `O(E)` relaxation.
+
+[tt-fp]: https://docs.rs/vulture/latest/vulture/trait.Timetable.html#footpaths
+[tc]: https://en.wikipedia.org/wiki/Transitive_closure
 
 The earlier "wish list" item — an opt-in transitive-closure pass
 during `GtfsTimetable::new` — has effectively been replaced by

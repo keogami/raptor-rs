@@ -421,6 +421,12 @@ impl<'gtfs> GtfsTimetable<'gtfs> {
     /// `O(E)` relaxation instead of multi-source Dijkstra. Returns
     /// `self` for chaining.
     ///
+    /// A relation is *transitively closed* when every reachable walk
+    /// is already a single direct edge — `A → B` and `B → C` implies
+    /// `A → C` is in the relation too. See the [`Timetable`] trait's
+    /// Footpaths section for the full discussion and the soundness
+    /// contract.
+    ///
     /// Use when you know the underlying `transfers.txt` (or any
     /// pre-processing you've applied) is closed — typically true for
     /// publisher-curated feeds like Berlin VBB or Paris IDFM.
