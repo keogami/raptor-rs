@@ -1507,6 +1507,7 @@ dependencies = [
  "humantime",
  "jiff",
  "log",
+ "rayon",
  "rstar",
  "smallvec",
  "thiserror",

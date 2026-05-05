@@ -12,9 +12,11 @@ name = "raptor"
 path = "src/lib.rs"
 
 [features]
+default = ["parallel"]
 internal = []
 dotgraph = ["dep:dot_graph"]
 gtfs-bench = []
+parallel = ["dep:rayon"]
 
 [dev-dependencies]
 anyhow = "1.0.100"
@@ -39,6 +41,7 @@ fixedbitset = "0.5"
 gtfs-structures = "0.46.1"
 jiff = "0.2"
 log = "0.4.29"
+rayon = { version = "1.10", optional = true }
 rstar = "0.12"
 smallvec = "1.15.1"
 thiserror = "2.0.18"
