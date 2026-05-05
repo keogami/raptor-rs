@@ -1,5 +1,6 @@
 use crate::Duration;
 use crate::RaptorCache;
+use crate::RaptorCachePool;
 use crate::SecondOfDay;
 use crate::Timetable;
 use crate::manual::SimpleTimetable;
@@ -2039,4 +2040,141 @@ fn with_timing_handles_one_hop_walking_transfer() {
     assert_eq!(l2.alight, d);
     assert_eq!(l2.depart, SecondOfDay(20));
     assert_eq!(l2.arrive, SecondOfDay(30));
+}
+
+// ── RaptorCachePool tests ───────────────────────────────────────────
+
+/// Trivial 4-stop, 2-route timetable used by the pool tests below.
+fn pool_test_timetable() -> SimpleTimetable<char, u32, u32> {
+    SimpleTimetable::new()
+        .route(
+            1,
+            &['A', 'B', 'C'],
+            &[(
+                10,
+                &[
+                    (SecondOfDay(0), SecondOfDay(0)),
+                    (SecondOfDay(60), SecondOfDay(60)),
+                    (SecondOfDay(120), SecondOfDay(120)),
+                ],
+            )],
+        )
+        .route(
+            2,
+            &['C', 'D'],
+            &[(
+                20,
+                &[
+                    (SecondOfDay(150), SecondOfDay(150)),
+                    (SecondOfDay(210), SecondOfDay(210)),
+                ],
+            )],
+        )
+}
+
+#[test]
+fn pool_checkout_matches_single_cache_result() {
+    let tt = pool_test_timetable();
+    let a = tt.stop_idx_of(&'A');
+    let d = tt.stop_idx_of(&'D');
+
+    let baseline = tt
+        .query()
+        .from(a)
+        .to(d)
+        .max_transfers(3)
+        .depart_at(SecondOfDay(0))
+        .run();
+
+    let pool = RaptorCachePool::for_timetable(&tt);
+    let mut cache = pool.checkout();
+    let pooled = tt
+        .query()
+        .from(a)
+        .to(d)
+        .max_transfers(3)
+        .depart_at(SecondOfDay(0))
+        .run_with_cache(&mut cache);
+
+    assert_eq!(baseline.len(), pooled.len());
+    for (a, b) in baseline.iter().zip(&pooled) {
+        assert_eq!(a.plan, b.plan);
+        assert_eq!(a.arrival(), b.arrival());
+    }
+}
+
+#[test]
+fn pool_reuses_caches_across_checkouts() {
+    let tt = pool_test_timetable();
+    let pool: RaptorCachePool = RaptorCachePool::for_timetable(&tt);
+
+    // Pool starts empty.
+    assert!(format!("{:?}", pool).contains("idle_caches: 0"));
+
+    {
+        let _c = pool.checkout(); // allocates fresh
+    }
+    // Cache returned on drop.
+    assert!(format!("{:?}", pool).contains("idle_caches: 1"));
+
+    {
+        let _c1 = pool.checkout(); // reuses returned cache
+        let _c2 = pool.checkout(); // pool now empty, allocates a second
+    }
+    // Both returned.
+    assert!(format!("{:?}", pool).contains("idle_caches: 2"));
+}
+
+#[test]
+fn pool_is_sync_across_threads() {
+    let tt = pool_test_timetable();
+    let a = tt.stop_idx_of(&'A');
+    let d = tt.stop_idx_of(&'D');
+    let pool: RaptorCachePool = RaptorCachePool::for_timetable(&tt);
+
+    let baseline_arrival = tt
+        .query()
+        .from(a)
+        .to(d)
+        .max_transfers(3)
+        .depart_at(SecondOfDay(0))
+        .run()
+        .into_iter()
+        .map(|j| j.arrival())
+        .collect::<Vec<_>>();
+
+    std::thread::scope(|s| {
+        let mut handles = Vec::new();
+        for _ in 0..8 {
+            let pool = &pool;
+            let tt = &tt;
+            let baseline = &baseline_arrival;
+            handles.push(s.spawn(move || {
+                let mut cache = pool.checkout();
+                let arrivals = tt
+                    .query()
+                    .from(a)
+                    .to(d)
+                    .max_transfers(3)
+                    .depart_at(SecondOfDay(0))
+                    .run_with_cache(&mut cache)
+                    .into_iter()
+                    .map(|j| j.arrival())
+                    .collect::<Vec<_>>();
+                assert_eq!(&arrivals, baseline);
+            }));
+        }
+        for h in handles {
+            h.join().unwrap();
+        }
+    });
+
+    // After 8 threads, the pool has at least 1 idle cache (could have up to
+    // 8 if all ran in parallel, fewer if some serialised).
+    let idle_caches = format!("{:?}", pool);
+    assert!(
+        !idle_caches.contains("idle_caches: 0"),
+        "pool should have returned caches after threads finished: {}",
+        idle_caches
+    );
 }

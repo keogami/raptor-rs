@@ -76,6 +76,7 @@
 use std::cmp::Reverse;
 use std::collections::{BTreeMap, BinaryHeap};
 use std::fmt;
+use std::sync::Mutex;
 
 use fixedbitset::FixedBitSet;
 use smallvec::SmallVec;
@@ -2006,5 +2007,120 @@ impl<L: Label> RaptorCache<L> {
         }
 
         self.walked_buf.clear();
+    }
+}
+
+/// A `Sync` pool of [`RaptorCache`]s sized for one timetable. Hand it
+/// to multiple threads (or a Rayon worker pool) and have each thread
+/// `checkout()` a cache for the duration of one query.
+///
+/// Backed by a mutex-protected freelist; the lock is only held long
+/// enough to pop or push, never during the query itself. Caches grow
+/// lazily — the pool starts empty and allocates a fresh cache when a
+/// thread checks out and the freelist is empty. Returned caches are
+/// reused by the next checkout.
+///
+/// Construct with [`RaptorCachePool::for_timetable`] (or
+/// [`RaptorCachePool::with_capacity`] when you don't have the timetable
+/// in scope yet). Like [`RaptorCache`] itself, a pool is sized for one
+/// specific timetable's `n_stops`/`n_routes` and panics on dimension
+/// mismatch when its caches are used.
+///
+/// ```no_run
+/// # use raptor::{RaptorCachePool, SecondOfDay, Timetable};
+/// # fn ex<T: Timetable + Sync>(tt: &T, queries: &[(raptor::StopIdx, raptor::StopIdx)]) {
+/// let pool = RaptorCachePool::for_timetable(tt);
+/// // Sequential or parallel — same code:
+/// for &(start, end) in queries {
+///     let mut cache = pool.checkout();
+///     let _ = tt.query()
+///         .from(start)
+///         .to(end)
+///         .depart_at(SecondOfDay::hms(9, 0, 0))
+///         .run_with_cache(&mut cache);
+/// }
+/// # }
+/// ```
+pub struct RaptorCachePool<L: Label = ArrivalTime> {
+    n_stops: u32,
+    n_routes: u32,
+    pool: Mutex<Vec<RaptorCache<L>>>,
+}
+
+impl<L: Label> RaptorCachePool<L> {
+    /// Constructs a pool sized for the given timetable. The pool starts
+    /// empty; caches are allocated on first checkout.
+    pub fn for_timetable<T: Timetable + ?Sized>(tt: &T) -> Self {
+        Self::with_capacity(tt.n_stops() as u32, tt.n_routes() as u32)
+    }
+
+    /// Constructs a pool for a timetable with the given counts. Use
+    /// [`for_timetable`](Self::for_timetable) when you have the timetable
+    /// in scope.
+    pub fn with_capacity(n_stops: u32, n_routes: u32) -> Self {
+        Self {
+            n_stops,
+            n_routes,
+            pool: Mutex::new(Vec::new()),
+        }
+    }
+
+    /// Borrow a cache from the pool. Allocates a fresh one if the pool
+    /// is empty. The returned guard returns the cache to the pool when
+    /// dropped, ready for the next checkout.
+    pub fn checkout(&self) -> PooledCache<'_, L> {
+        let cache = self
+            .pool
+            .lock()
+            .expect("RaptorCachePool mutex poisoned")
+            .pop()
+            .unwrap_or_else(|| RaptorCache::with_capacity(self.n_stops, self.n_routes));
+        PooledCache {
+            pool: self,
+            cache: Some(cache),
+        }
+    }
+}
+
+impl<L: Label> std::fmt::Debug for RaptorCachePool<L> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let len = self.pool.lock().map(|p| p.len()).unwrap_or(0);
+        f.debug_struct("RaptorCachePool")
+            .field("n_stops", &self.n_stops)
+            .field("n_routes", &self.n_routes)
+            .field("idle_caches", &len)
+            .finish()
+    }
+}
+
+/// RAII guard handed out by [`RaptorCachePool::checkout`]. Derefs to
+/// [`RaptorCache`]; pass `&mut pooled_cache` wherever a `&mut RaptorCache`
+/// is wanted. Returns the cache to the pool on drop.
+pub struct PooledCache<'p, L: Label = ArrivalTime> {
+    pool: &'p RaptorCachePool<L>,
+    cache: Option<RaptorCache<L>>,
+}
+
+impl<L: Label> std::ops::Deref for PooledCache<'_, L> {
+    type Target = RaptorCache<L>;
+    fn deref(&self) -> &RaptorCache<L> {
+        self.cache.as_ref().expect("PooledCache used after drop")
+    }
+}
+
+impl<L: Label> std::ops::DerefMut for PooledCache<'_, L> {
+    fn deref_mut(&mut self) -> &mut RaptorCache<L> {
+        self.cache.as_mut().expect("PooledCache used after drop")
+    }
+}
+
+impl<L: Label> Drop for PooledCache<'_, L> {
+    fn drop(&mut self) {
+        if let Some(cache) = self.cache.take() {
+            // Best-effort return; if the mutex is poisoned, drop the cache.
+            if let Ok(mut pool) = self.pool.pool.lock() {
+                pool.push(cache);
+            }
+        }
     }
 }
