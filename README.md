@@ -7,6 +7,39 @@ stops — trading off between fewer transfers and earlier arrival.
 
 Based on the paper: [*Round-Based Public Transit Routing*](https://www.microsoft.com/en-us/research/publication/round-based-public-transit-routing/) by Delling, Pajor, and Werneck.
 
+## Concepts
+
+RAPTOR proceeds in *rounds*. Round k holds the earliest known arrival time
+at every stop reachable using at most k trips. Each round scans the routes
+that touched a stop improved in the previous round, then relaxes walking
+footpaths to a fixed point. The output is a Pareto front: one journey per
+trip count between `0` and `max_transfers`, with strictly earlier arrivals
+as you allow more trips. There is no Dijkstra-style priority queue and no
+shortest-path tree — just successive rounds of array updates.
+
+The default routing is *single-criterion*: minimise arrival time, then
+report one journey per trip count. For problems where a single best answer
+is the wrong shape — "show me a slower route with less walking" — swap in a
+multi-criterion `Label` (e.g. the bundled `ArrivalAndWalk`) and the algorithm
+returns a real Pareto front trading off the criteria you care about. The
+`Label` trait is the only seam in the algorithm where this plugs in; the
+core scan is unchanged.
+
+The public surface is small. Implement (or use) the `Timetable` trait to
+describe a transit network — `GtfsTimetable` does this for any GTFS feed —
+then build queries with `tt.query().from(...).to(...).depart_at(...).run()`.
+A `RaptorCache` reuses scratch allocations across queries against the same
+timetable, useful for server workloads. Per-leg trip and timing
+reconstruction is opt-in via `journey.with_timing(...)`; `Journey.plan` on
+its own is just `(route, alight stop)` topology.
+
+Things you can usually ignore until you need them: the `Label` trait
+(default is fine for normal routing); the `Timetable` trait internals
+(only relevant if you have non-GTFS data); range queries via
+`.depart_in_window(...)` (only if you want a profile rather than one
+departure); and `RaptorCache` (only worth it if you run many queries
+back-to-back).
+
 ## Quick start: query a GTFS feed
 
 The `gtfs` module wraps a parsed GTFS feed (via the
