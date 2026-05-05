@@ -6,6 +6,7 @@ authors = ["Stephan Hügel <urschrei@gmail.com>"]
 description = "Rust implementation of RAPTOR (Round-bAsed Public Transit Routing)"
 license = "Apache-2.0"
 repository = "https://github.com/urschrei/vulture"
+keywords = ["raptor", "routing", "gtfs", "transport"]
 
 [lib]
 name = "vulture"
