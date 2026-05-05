@@ -80,10 +80,12 @@ fn bench_gtfs_query(c: &mut Criterion) {
     group.finish();
 }
 
-/// Range query (rRAPTOR-shape) across a 60-departure window: 09:00 to
-/// 10:00 in 1-minute steps. Compares serial `.run_with_cache(&mut cache)`
-/// against parallel `.run_with_pool(&pool)`. The win comes from
-/// fanning the per-departure work across cores.
+/// Range query across a 60-departure window: 09:00 to 10:00 in 1-minute
+/// steps. Compares serial `.run_with_cache(&mut cache)` (rRAPTOR — single
+/// reverse-chronological scan reusing labels across departures, paper §4)
+/// against parallel `.run_with_pool(&pool)` (naïve batch fanned across
+/// cores). For wide windows on multicore the parallel arm wins; for
+/// single-core or narrow windows rRAPTOR wins.
 fn bench_gtfs_range_query(c: &mut Criterion) {
     let gtfs = Gtfs::new(GTFS_PATH).unwrap();
     let timetable = GtfsTimetable::new(&gtfs, service_date()).unwrap();
