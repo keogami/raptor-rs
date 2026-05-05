@@ -1,4 +1,4 @@
-# raptor-rs
+# Vulture
 
 Rust implementation of [RAPTOR](https://www.microsoft.com/en-us/research/publication/round-based-public-transit-routing/) (Delling, Pajor, Werneck): given a transit network, find all Pareto-optimal journeys between two stops, trading fewer transfers against earlier arrival.
 
@@ -9,8 +9,8 @@ The `gtfs` module wraps a parsed GTFS feed and implements the `Timetable` trait.
 ```rust
 use gtfs_structures::Gtfs;
 use jiff::civil::date;
-use raptor::{SecondOfDay, Timetable};
-use raptor::gtfs::GtfsTimetable;
+use vulture::{SecondOfDay, Timetable};
+use vulture::gtfs::GtfsTimetable;
 
 let gtfs = Gtfs::new("aux/dmrc_gtfs.zip")?;
 let tt = GtfsTimetable::new(&gtfs, date(2024, 1, 15))?;
@@ -33,7 +33,7 @@ for j in &journeys {
 
 Runnable as `cargo run --example gtfs-timetable -- aux/dmrc_gtfs.zip 2024-01-15 1 44`.
 
-A returned `Journey` has `plan: Vec<(RouteIdx, StopIdx)>` ("take this route, get off at this stop"), an `origin` and `target` (relevant when the query supplies multiple of either), and a `label` carrying the criterion under optimisation. `journey.arrival()` reads it as a `SecondOfDay`. See [`Journey`](https://docs.rs/raptor/latest/raptor/struct.Journey.html) for the full contract; for trip IDs and per-leg depart/arrive times see [`Journey::with_timing`](https://docs.rs/raptor/latest/raptor/struct.Journey.html#method.with_timing).
+A returned `Journey` has `plan: Vec<(RouteIdx, StopIdx)>` ("take this route, get off at this stop"), an `origin` and `target` (relevant when the query supplies multiple of either), and a `label` carrying the criterion under optimisation. `journey.arrival()` reads it as a `SecondOfDay`. See [`Journey`](https://docs.rs/vulture/latest/vulture/struct.Journey.html) for the full contract; for trip IDs and per-leg depart/arrive times see [`Journey::with_timing`](https://docs.rs/vulture/latest/vulture/struct.Journey.html#method.with_timing).
 
 ## Worked examples
 
@@ -109,7 +109,7 @@ let profile = tt
     .run();
 ```
 
-Returns `Vec<RangeJourney>` — each entry is a `(depart, journey)` pair, Pareto-filtered on `(later depart, fewer transfers, earlier arrival)`. Serial uses [rRAPTOR](https://docs.rs/raptor/latest/raptor/trait.Timetable.html#method.query) (single reverse-chronological scan reusing labels across departures); `.run_par()` spreads the per-departure work across a Rayon thread pool.
+Returns `Vec<RangeJourney>` — each entry is a `(depart, journey)` pair, Pareto-filtered on `(later depart, fewer transfers, earlier arrival)`. Serial uses [rRAPTOR](https://docs.rs/vulture/latest/vulture/trait.Timetable.html#method.query) (single reverse-chronological scan reusing labels across departures); `.run_par()` spreads the per-departure work across a Rayon thread pool.
 
 ### Server workload: many queries, multi-threaded
 
@@ -117,7 +117,7 @@ Allocate a `RaptorCachePool` once and have each thread check out a cache:
 
 ```rust,ignore
 use rayon::prelude::*;
-use raptor::RaptorCachePool;
+use vulture::RaptorCachePool;
 
 let pool = RaptorCachePool::for_timetable(&tt);
 
@@ -136,15 +136,15 @@ The pool's `checkout()` returns an RAII guard that returns the cache on drop; sa
 
 ## Features
 
-- **`Timetable` trait** — describes a transit network. Use the bundled [`GtfsTimetable`](https://docs.rs/raptor/latest/raptor/gtfs/struct.GtfsTimetable.html) for any GTFS feed, or [implement directly](https://docs.rs/raptor/latest/raptor/trait.Timetable.html) for non-GTFS data.
+- **`Timetable` trait** — describes a transit network. Use the bundled [`GtfsTimetable`](https://docs.rs/vulture/latest/vulture/gtfs/struct.GtfsTimetable.html) for any GTFS feed, or [implement directly](https://docs.rs/vulture/latest/vulture/trait.Timetable.html) for non-GTFS data.
 - **Typestate query builder** — `tt.query().from(...).to(...).max_transfers(...).depart_at(...).run()`. Compile-time enforced order; `.depart_at(...)` and `.depart_in_window(...)` switch the return type.
 - **Multi-source / multi-target** — `.from(...)` and `.to(...)` accept a `StopIdx`, a slice, a `Vec`, or `(stop, walk_offset)` pairs. Pair with `station_stops(parent_id)` for "any platform of this station" queries.
 - **Range queries** — `.depart_in_window(times)` returns a Pareto profile; serial path uses rRAPTOR, `.run_par()` and `.run_with_pool(&pool)` use a parallel naïve batch.
-- **`Label` trait** — single-criterion [`ArrivalTime`](https://docs.rs/raptor/latest/raptor/struct.ArrivalTime.html) is the default. [`raptor::labels`](https://docs.rs/raptor/latest/raptor/labels/index.html) ships [`ArrivalAndWalk`](https://docs.rs/raptor/latest/raptor/labels/struct.ArrivalAndWalk.html) for trade-off queries (slower routes with less walking). Implement [`Label`](https://docs.rs/raptor/latest/raptor/trait.Label.html) for fares, accessibility, etc.
-- **Walking footpaths from coordinates** — [`with_walking_footpaths(&gtfs, max_dist_m, speed_m_per_s)`](https://docs.rs/raptor/latest/raptor/gtfs/struct.GtfsTimetable.html#method.with_walking_footpaths) builds bidirectional R-tree walking edges, preserving any existing `transfers.txt`.
-- **Closed-footpath fast path** — if your `transfers.txt` is the entire intended relation, [`assert_footpaths_closed()`](https://docs.rs/raptor/latest/raptor/gtfs/struct.GtfsTimetable.html#method.assert_footpaths_closed) opts into a single-pass O(E) relaxation instead of Dijkstra.
+- **`Label` trait** — single-criterion [`ArrivalTime`](https://docs.rs/vulture/latest/vulture/struct.ArrivalTime.html) is the default. [`vulture::labels`](https://docs.rs/vulture/latest/vulture/labels/index.html) ships [`ArrivalAndWalk`](https://docs.rs/vulture/latest/vulture/labels/struct.ArrivalAndWalk.html) for trade-off queries (slower routes with less walking). Implement [`Label`](https://docs.rs/vulture/latest/vulture/trait.Label.html) for fares, accessibility, etc.
+- **Walking footpaths from coordinates** — [`with_walking_footpaths(&gtfs, max_dist_m, speed_m_per_s)`](https://docs.rs/vulture/latest/vulture/gtfs/struct.GtfsTimetable.html#method.with_walking_footpaths) builds bidirectional R-tree walking edges, preserving any existing `transfers.txt`.
+- **Closed-footpath fast path** — if your `transfers.txt` is the entire intended relation, [`assert_footpaths_closed()`](https://docs.rs/vulture/latest/vulture/gtfs/struct.GtfsTimetable.html#method.assert_footpaths_closed) opts into a single-pass O(E) relaxation instead of Dijkstra.
 - **`RaptorCache`** — reusable scratch allocations across queries against one timetable. **`RaptorCachePool`** is the `Sync` variant for thread pools.
-- **Per-leg timing** — [`journey.with_timing(&tt, depart, origin_walk)`](https://docs.rs/raptor/latest/raptor/struct.Journey.html#method.with_timing) reconstructs trip IDs and per-leg depart/arrive times. `Journey.plan` alone is just topology.
+- **Per-leg timing** — [`journey.with_timing(&tt, depart, origin_walk)`](https://docs.rs/vulture/latest/vulture/struct.Journey.html#method.with_timing) reconstructs trip IDs and per-leg depart/arrive times. `Journey.plan` alone is just topology.
 
 ## When To Use What
 
@@ -170,13 +170,13 @@ Single-query latency, warm `RaptorCache`, M-series Apple Silicon, single thread.
 | Berlin VBB | 42,000 | 71,000 | Hbf → Alex (station-to-station) | 385 µs |
 | Paris IDFM | 54,000 | 146,000 | Châtelet → Versailles RD | 17 ms |
 
-For range-query latencies (serial rRAPTOR vs parallel naïve batch), see the [bench source](raptor/benches/gtfs.rs) and the linked benchmark page.
+For range-query latencies (serial rRAPTOR vs parallel naïve batch), see the [bench source](vulture/benches/gtfs.rs) and the linked benchmark page.
 
 ## Cargo features
 
 - `parallel` (default-on) — pulls in `rayon`, enables `Query::run_par` / `Query::run_with_pool`. Opt out with `default-features = false` for wasm or minimal builds; `RaptorCachePool` itself stays available.
 - `gtfs-bench` — enables the `gtfs` criterion benchmark.
-- `internal` — enables the `raptor` criterion benchmark over `manual::SimpleTimetable`.
+- `internal` — enables the `manual` criterion benchmark over `manual::SimpleTimetable`.
 
 ## License
 

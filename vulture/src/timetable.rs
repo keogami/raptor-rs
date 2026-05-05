@@ -135,7 +135,7 @@ pub trait Timetable {
     /// `.depart_in_window(...)` for a range query, then `.run()`.
     ///
     /// ```no_run
-    /// # use raptor::{Timetable, SecondOfDay, Duration, StopIdx};
+    /// # use vulture::{Timetable, SecondOfDay, Duration, StopIdx};
     /// # fn ex<T: Timetable>(tt: &T, start: StopIdx, end: StopIdx) {
     /// let journeys = tt
     ///     .query()
@@ -172,8 +172,8 @@ pub trait Timetable {
     /// writing your own.
     ///
     /// ```no_run
-    /// # use raptor::{Timetable, SecondOfDay, StopIdx};
-    /// # use raptor::labels::ArrivalAndWalk;
+    /// # use vulture::{Timetable, SecondOfDay, StopIdx};
+    /// # use vulture::labels::ArrivalAndWalk;
     /// # fn ex<T: Timetable>(tt: &T, start: StopIdx, end: StopIdx) {
     /// let pareto_front = tt
     ///     .query_with_label::<ArrivalAndWalk>()

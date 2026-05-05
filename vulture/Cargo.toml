@@ -1,14 +1,14 @@
 [package]
-name = "raptor"
+name = "vulture"
 version = "0.14.0"
 edition = "2024"
-authors = ["keogami <https://github.com/keogami>", "Stephan Hügel <https://github.com/urschrei>"]
-description = "Rust impl of RAPTOR (Round-bAsed Public Transit Routing)"
+authors = ["Stephan Hügel <urschrei@gmail.com>"]
+description = "Rust implementation of RAPTOR (Round-bAsed Public Transit Routing)"
 license = "Apache-2.0"
-repository = "https://github.com/keogami/raptor-rs"
+repository = "https://github.com/urschrei/vulture"
 
 [lib]
-name = "raptor"
+name = "vulture"
 path = "src/lib.rs"
 
 [features]

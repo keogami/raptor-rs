@@ -1494,42 +1494,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f8dcc9c7d52a811697d2151c701e0d08956f92b0e24136cf4cf27b57a6a0d9bf"
 
 [[package]]
-name = "raptor"
-version = "0.14.0"
-dependencies = [
- "anyhow",
- "chrono",
- "criterion",
- "dot_graph",
- "env_logger",
- "fixedbitset",
- "gtfs-structures",
- "humantime",
- "jiff",
- "log",
- "rayon",
- "rstar",
- "smallvec",
- "thiserror",
-]
-
-[[package]]
-name = "raptor-dotgraph"
-version = "0.1.0"
-dependencies = [
- "clap",
- "raptor",
-]
-
-[[package]]
-name = "raptor-proptest"
-version = "0.0.0"
-dependencies = [
- "hegeltest",
- "raptor",
-]
-
-[[package]]
 name = "rayon"
 version = "1.12.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2184,6 +2148,42 @@ name = "version_check"
 version = "0.9.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0b928f33d975fc6ad9f86c8f283853ad26bdd5b10b7f1542aa2fa15e2289105a"
+
+[[package]]
+name = "vulture"
+version = "0.14.0"
+dependencies = [
+ "anyhow",
+ "chrono",
+ "criterion",
+ "dot_graph",
+ "env_logger",
+ "fixedbitset",
+ "gtfs-structures",
+ "humantime",
+ "jiff",
+ "log",
+ "rayon",
+ "rstar",
+ "smallvec",
+ "thiserror",
+]
+
+[[package]]
+name = "vulture-dotgraph"
+version = "0.1.0"
+dependencies = [
+ "clap",
+ "vulture",
+]
+
+[[package]]
+name = "vulture-proptest"
+version = "0.0.0"
+dependencies = [
+ "hegeltest",
+ "vulture",
+]
 
 [[package]]
 name = "walkdir"

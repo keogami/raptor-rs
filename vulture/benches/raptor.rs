@@ -1,7 +1,7 @@
 use criterion::{BenchmarkId, Criterion, criterion_group, criterion_main};
-use raptor::Timetable;
-use raptor::manual::builders::*;
-use raptor::{Duration, SecondOfDay};
+use vulture::Timetable;
+use vulture::manual::builders::*;
+use vulture::{Duration, SecondOfDay};
 
 /// Routes from the first stop to the last on a single route. Tests how performance
 /// scales as the number of stops and trips on one route grows. (explained by llm)

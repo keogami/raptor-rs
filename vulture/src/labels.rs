@@ -23,8 +23,8 @@ use crate::{Duration, Label, SecondOfDay};
 /// less.
 ///
 /// ```no_run
-/// use raptor::{Journey, StopIdx, SecondOfDay, Timetable};
-/// use raptor::labels::ArrivalAndWalk;
+/// use vulture::{Journey, StopIdx, SecondOfDay, Timetable};
+/// use vulture::labels::ArrivalAndWalk;
 ///
 /// # fn run<T: Timetable>(tt: &T, start: StopIdx, target: StopIdx) {
 /// let journeys: Vec<Journey<ArrivalAndWalk>> = tt

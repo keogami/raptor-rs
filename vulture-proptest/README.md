@@ -58,7 +58,7 @@ See `soundness.md` at the repo root for the full issue catalogue.
 ## Reproducing a failure
 
 Hegel persists failing seeds to `.hegel/` (gitignored). Re-running
-`cargo nextest r -p raptor <test_name> --run-ignored all` deterministically
+`cargo nextest r -p vulture-proptest <test_name> --run-ignored all` deterministically
 reproduces the most recent shrunk counterexample. To reproduce a specific
 failure on a different machine, pass the seed explicitly:
 

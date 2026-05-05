@@ -1,4 +1,4 @@
-# raptor-rs: Roadmap to Production
+# vulture: Roadmap to Production
 
 A working document for turning this codebase into a
 production-grade RAPTOR implementation. Organised by priority: correctness
@@ -640,13 +640,13 @@ someone files an issue.
 Currently: `raptor`, `dotgraph` as workspace members. The `gtfs` module
 lives inside `raptor` and is gated behind nothing. A future split:
 
-- `raptor-core` — the algorithm and `Timetable` trait, no
+- `vulture-core` — the algorithm and `Timetable` trait, no
   format-specific dependencies.
-- `raptor-gtfs` — the GTFS adapter.
-- `raptor-gtfsrt` — real-time overlay (when it lands).
-- `raptor-cli` — a CLI that wraps the above for ad-hoc queries.
+- `vulture-gtfs` — the GTFS adapter.
+- `vulture-gtfsrt` — real-time overlay (when it lands).
+- `vulture-cli` — a CLI that wraps the above for ad-hoc queries.
 - `raptor` — facade crate that re-exports the others, gated behind
-  feature flags. Keeps `cargo add raptor` working.
+  feature flags. Keeps `cargo add vulture` working.
 
 Don't do this until at least one of the format-specific crates is
 substantial. Premature splitting just adds friction.
@@ -662,11 +662,11 @@ that earlier releases don't constrain the design of later ones.
   0.7, 0.8, and 0.9 are all landed on the v0.3 branch. Plus 1.5
   (allocation reuse) and 4.1 (docs pass) because they're cheap. The
   property-based test against the reference solver is green across all
-  three generator layers. Announcement post: "raptor-rs now produces
+  three generator layers. Announcement post: "vulture now produces
   correct results."
 
 - **v0.4 (Performance):** Phase 1 in full. Benchmark numbers within
-  3× of the published RAPTOR figures. Announcement post: "raptor-rs is
+  3× of the published RAPTOR figures. Announcement post: "vulture is
   now fast enough for production servers."
 
 - **v0.5 (McRAPTOR readiness):** Phase 2 in full. The single-criterion
@@ -674,7 +674,7 @@ that earlier releases don't constrain the design of later ones.
   internal restructuring.
 
 - **v0.6 (Multi-criterion + range):** McRAPTOR shipped, rRAPTOR shipped
-  (3.1). Announcement post: "raptor-rs supports multi-criterion and
+  (3.1). Announcement post: "vulture supports multi-criterion and
   range queries."
 
 - **v0.7 (Real-time):** GTFS-RT (3.2), service days (3.3), accessibility

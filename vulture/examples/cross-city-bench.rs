@@ -13,10 +13,10 @@
 
 use gtfs_structures::Gtfs;
 use jiff::civil::date;
-use raptor::gtfs::GtfsTimetable;
-use raptor::{RaptorCache, SecondOfDay, Timetable};
 use std::path::Path;
 use std::time::Instant;
+use vulture::gtfs::GtfsTimetable;
+use vulture::{RaptorCache, SecondOfDay, Timetable};
 
 const DEPARTURE_TIME: SecondOfDay = SecondOfDay(9 * 3600);
 const QUERY_REPEATS: usize = 50;
@@ -283,10 +283,10 @@ fn main() -> anyhow::Result<()> {
 fn resolve_endpoint(
     tt: &GtfsTimetable,
     e: &Endpoint,
-) -> Result<Vec<(raptor::StopIdx, raptor::Duration)>, String> {
+) -> Result<Vec<(vulture::StopIdx, vulture::Duration)>, String> {
     match *e {
         Endpoint::Stop(id) => match tt.stop_idx(id) {
-            Some(idx) => Ok(vec![(idx, raptor::Duration::ZERO)]),
+            Some(idx) => Ok(vec![(idx, vulture::Duration::ZERO)]),
             None => Err(format!("unknown stop `{id}`")),
         },
         Endpoint::Station(id) => {

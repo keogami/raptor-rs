@@ -134,8 +134,8 @@ type GtfsResult<T> = std::result::Result<T, GtfsError>;
 /// ```no_run
 /// use gtfs_structures::Gtfs;
 /// use jiff::civil::date;
-/// use raptor::{SecondOfDay, Timetable};
-/// use raptor::gtfs::GtfsTimetable;
+/// use vulture::{SecondOfDay, Timetable};
+/// use vulture::gtfs::GtfsTimetable;
 ///
 /// # fn ex() -> anyhow::Result<()> {
 /// let gtfs = Gtfs::new("path/to/gtfs.zip")?;

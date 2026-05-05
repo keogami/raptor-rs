@@ -3,9 +3,9 @@
 use gtfs_structures::Gtfs;
 use humantime::format_duration;
 use jiff::civil::Date;
-use raptor::{Duration, Journey, Timetable, gtfs::GtfsTimetable};
 use std::env;
 use std::time::Duration as StdDuration;
+use vulture::{Duration, Journey, Timetable, gtfs::GtfsTimetable};
 
 fn main() -> anyhow::Result<()> {
     env_logger::Builder::from_env(
@@ -37,7 +37,7 @@ fn main() -> anyhow::Result<()> {
         .stop_idx(target)
         .ok_or_else(|| anyhow::anyhow!("unknown target stop: {target}"))?;
 
-    let departure_time = raptor::SecondOfDay::hms(19, 15, 0);
+    let departure_time = vulture::SecondOfDay::hms(19, 15, 0);
     let journeys = timetable
         .query()
         .from(&[(start_idx, Duration::ZERO)])

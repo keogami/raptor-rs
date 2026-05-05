@@ -3,7 +3,7 @@
 //!
 //! See `lib.rs` for the trip-count convention banner.
 
-use raptor::manual::SimpleTimetable;
+use vulture::manual::SimpleTimetable;
 
 /// Top-level spec for one randomly-generated test case.
 #[derive(Debug, Clone)]
@@ -81,21 +81,21 @@ pub fn render(spec: &NetworkSpec) -> SimpleTimetable<u8, u8, u16> {
             "leg_durations length mismatch",
         );
 
-        let mut trip_owned: Vec<(u16, Vec<(raptor::SecondOfDay, raptor::SecondOfDay)>)> =
+        let mut trip_owned: Vec<(u16, Vec<(vulture::SecondOfDay, vulture::SecondOfDay)>)> =
             Vec::with_capacity(route.trips.len());
         for trip in &route.trips {
             assert_eq!(trip.leg_durations.len(), stops.len() - 1);
             assert_eq!(trip.dwell_times.len(), stops.len());
 
-            let mut times: Vec<(raptor::SecondOfDay, raptor::SecondOfDay)> =
+            let mut times: Vec<(vulture::SecondOfDay, vulture::SecondOfDay)> =
                 Vec::with_capacity(stops.len());
-            let arr0 = raptor::SecondOfDay(trip.first_dep as u32);
-            let dep0 = arr0 + raptor::Duration(trip.dwell_times[0] as u32);
+            let arr0 = vulture::SecondOfDay(trip.first_dep as u32);
+            let dep0 = arr0 + vulture::Duration(trip.dwell_times[0] as u32);
             times.push((arr0, dep0));
             for i in 1..stops.len() {
                 let prev_dep = times[i - 1].1;
-                let arr = prev_dep + raptor::Duration(trip.leg_durations[i - 1] as u32);
-                let dep = arr + raptor::Duration(trip.dwell_times[i] as u32);
+                let arr = prev_dep + vulture::Duration(trip.leg_durations[i - 1] as u32);
+                let dep = arr + vulture::Duration(trip.dwell_times[i] as u32);
                 times.push((arr, dep));
             }
 
@@ -103,7 +103,7 @@ pub fn render(spec: &NetworkSpec) -> SimpleTimetable<u8, u8, u16> {
             next_trip_id = next_trip_id.checked_add(1).expect("trip id overflow");
         }
 
-        let trip_refs: Vec<(u16, &[(raptor::SecondOfDay, raptor::SecondOfDay)])> = trip_owned
+        let trip_refs: Vec<(u16, &[(vulture::SecondOfDay, vulture::SecondOfDay)])> = trip_owned
             .iter()
             .map(|(id, times)| (*id, times.as_slice()))
             .collect();
@@ -118,7 +118,7 @@ pub fn render(spec: &NetworkSpec) -> SimpleTimetable<u8, u8, u16> {
             }
             if let Some(walk) = closed[from as usize][to as usize] {
                 tt = tt.footpath(from, to);
-                tt = tt.transfer_time(from, to, raptor::Duration(walk as u32));
+                tt = tt.transfer_time(from, to, vulture::Duration(walk as u32));
             }
         }
     }
@@ -228,7 +228,7 @@ fn close_footpaths_picks_min_when_duplicate() {
 
 #[test]
 fn render_single_route_two_stops_one_trip() {
-    use raptor::Timetable;
+    use vulture::Timetable;
     let spec = NetworkSpec {
         n_stops: 2,
         routes: vec![RouteSpec {
@@ -258,17 +258,17 @@ fn render_single_route_two_stops_one_trip() {
 
     // Position 0 of route r0 corresponds to stop 0; position 1 to stop 1.
     let trip = tt
-        .get_earliest_trip(r0, raptor::SecondOfDay::ZERO, 0)
+        .get_earliest_trip(r0, vulture::SecondOfDay::ZERO, 0)
         .expect("trip exists");
-    assert_eq!(tt.get_arrival_time(trip, 0), raptor::SecondOfDay(100));
-    assert_eq!(tt.get_departure_time(trip, 0), raptor::SecondOfDay(105));
-    assert_eq!(tt.get_arrival_time(trip, 1), raptor::SecondOfDay(125));
-    assert_eq!(tt.get_departure_time(trip, 1), raptor::SecondOfDay(125));
+    assert_eq!(tt.get_arrival_time(trip, 0), vulture::SecondOfDay(100));
+    assert_eq!(tt.get_departure_time(trip, 0), vulture::SecondOfDay(105));
+    assert_eq!(tt.get_arrival_time(trip, 1), vulture::SecondOfDay(125));
+    assert_eq!(tt.get_departure_time(trip, 1), vulture::SecondOfDay(125));
 }
 
 #[test]
 fn render_emits_transitively_closed_footpaths() {
-    use raptor::Timetable;
+    use vulture::Timetable;
     let spec = NetworkSpec {
         n_stops: 3,
         routes: vec![],
@@ -297,10 +297,10 @@ fn render_emits_transitively_closed_footpaths() {
     let s1 = tt.stop_idx_of(&1u8);
     let s2 = tt.stop_idx_of(&2u8);
 
-    let from_0: Vec<raptor::StopIdx> = tt.get_footpaths_from(s0).to_vec();
+    let from_0: Vec<vulture::StopIdx> = tt.get_footpaths_from(s0).to_vec();
     assert!(from_0.contains(&s1), "direct A->B");
     assert!(from_0.contains(&s2), "transitive A->C must be present");
-    assert_eq!(tt.get_transfer_time(s0, s2), raptor::Duration(7));
+    assert_eq!(tt.get_transfer_time(s0, s2), vulture::Duration(7));
 }
 
 // -------- Hegel generators ---------------------------------------------

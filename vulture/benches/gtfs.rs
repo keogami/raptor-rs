@@ -1,10 +1,10 @@
 use criterion::{BenchmarkId, Criterion, criterion_group, criterion_main};
 use gtfs_structures::Gtfs;
 use jiff::civil::{Date, date};
-use raptor::gtfs::GtfsTimetable;
-use raptor::{Duration, SecondOfDay};
-use raptor::{RaptorCache, RaptorCachePool, Timetable};
 use std::hint::black_box;
+use vulture::gtfs::GtfsTimetable;
+use vulture::{Duration, SecondOfDay};
+use vulture::{RaptorCache, RaptorCachePool, Timetable};
 
 const GTFS_PATH: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/../aux/dmrc_gtfs.zip");
 

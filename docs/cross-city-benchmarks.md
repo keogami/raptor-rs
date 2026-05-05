@@ -1,6 +1,6 @@
 # Cross-city benchmarks
 
-Real-feed performance numbers for `raptor-rs` v0.9.0 across four GTFS
+Real-feed performance numbers for `vulture` v0.9.0 across four GTFS
 feeds spanning two orders of magnitude in network size. Measured on
 Apple Silicon (arm64 macOS), single laptop, single thread; warm
 `RaptorCache` reused across queries; criterion-style methodology

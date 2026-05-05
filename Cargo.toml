@@ -1,9 +1,9 @@
 [workspace]
-members = ["raptor", "raptor-proptest", "dotgraph"]
+members = ["vulture", "vulture-proptest", "dotgraph"]
 resolver = "3"
 
 [profile.dev]
 debug = "full"
 
 [workspace.dependencies]
-raptor = { path = "./raptor" }
+vulture = { path = "./vulture" }

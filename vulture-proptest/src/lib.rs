@@ -18,7 +18,7 @@ pub mod spec;
 
 use std::collections::BTreeSet;
 
-use raptor::Journey;
+use vulture::Journey;
 
 /// Project the algorithm's `Vec<Journey>` to a Pareto front of
 /// `(arrival, trip_count)`, sorted by trip count ascending, keeping only
@@ -51,7 +51,7 @@ pub fn raptor_front(journeys: &[Journey]) -> BTreeSet<(u16, u8)> {
 }
 
 #[cfg(test)]
-use raptor::{Duration, SecondOfDay, Timetable};
+use vulture::{Duration, SecondOfDay, Timetable};
 
 #[cfg(test)]
 fn run_property(tc: &hegel::TestCase, spec: &spec::NetworkSpec) {
@@ -127,7 +127,7 @@ fn layer3_matches_reference(tc: hegel::TestCase) {
 /// stay fast enough to run on every commit.
 #[hegel::test]
 fn parallel_naive_matches_serial_rrap(tc: hegel::TestCase) {
-    use raptor::RaptorCachePool;
+    use vulture::RaptorCachePool;
 
     let spec = tc.draw(spec::network_spec(spec::layer1_bounds()));
     let timetable = spec::render(&spec);
@@ -190,7 +190,7 @@ fn parallel_naive_matches_serial_rrap(tc: hegel::TestCase) {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use raptor::{ArrivalTime, Journey, RouteIdx, StopIdx};
+    use vulture::{ArrivalTime, Journey, RouteIdx, StopIdx};
 
     fn j(arrival: u32, plan: Vec<(u32, u32)>) -> Journey {
         Journey {

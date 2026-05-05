@@ -53,7 +53,7 @@ impl SecondOfDay {
     /// common range-query input pattern:
     ///
     /// ```
-    /// # use raptor::SecondOfDay;
+    /// # use vulture::SecondOfDay;
     /// let deps: Vec<_> = SecondOfDay::every(
     ///     SecondOfDay::hms(17, 0, 0),
     ///     SecondOfDay::hms(17, 5, 0),

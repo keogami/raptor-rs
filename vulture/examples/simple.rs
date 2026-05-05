@@ -1,4 +1,4 @@
-use raptor::{RouteIdx, SecondOfDay, StopIdx, Timetable, TripIdx};
+use vulture::{RouteIdx, SecondOfDay, StopIdx, Timetable, TripIdx};
 
 // a single route with stops [0..10]
 struct SingleRoute;
@@ -74,8 +74,8 @@ fn main() {
     let mock = SingleRoute;
     let journey = mock
         .query()
-        .from(&[(StopIdx::new(0), raptor::Duration::ZERO)])
-        .to(&[(StopIdx::new(9), raptor::Duration::ZERO)])
+        .from(&[(StopIdx::new(0), vulture::Duration::ZERO)])
+        .to(&[(StopIdx::new(9), vulture::Duration::ZERO)])
         .max_transfers(10)
         .depart_at(SecondOfDay(0))
         .run();

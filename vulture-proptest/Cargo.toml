@@ -1,0 +1,16 @@
+[package]
+name = "vulture-proptest"
+version = "0.0.0"
+edition = "2024"
+description = "Property-based test harness for the vulture crate, using a brute-force reference solver"
+license = "Apache-2.0"
+repository = "https://github.com/urschrei/vulture"
+publish = false
+
+[lib]
+name = "vulture_proptest"
+path = "src/lib.rs"
+
+[dependencies]
+vulture = { workspace = true }
+hegel = { git = "https://github.com/hegeldev/hegel-rust", package = "hegeltest" }

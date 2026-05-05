@@ -28,8 +28,8 @@ use crate::time::SecondOfDay;
 /// timetable-sized buffers get reset rather than reallocated between queries.
 ///
 /// ```no_run
-/// # use raptor::{RaptorCache, SecondOfDay, Timetable};
-/// # fn ex<T: Timetable>(tt: &T, queries: &[(raptor::StopIdx, raptor::StopIdx)]) {
+/// # use vulture::{RaptorCache, SecondOfDay, Timetable};
+/// # fn ex<T: Timetable>(tt: &T, queries: &[(vulture::StopIdx, vulture::StopIdx)]) {
 /// let mut cache = RaptorCache::for_timetable(tt);
 /// for &(start, end) in queries {
 ///     let _ = tt.query()
@@ -176,8 +176,8 @@ impl<L: Label> RaptorCache<L> {
 /// mismatch when its caches are used.
 ///
 /// ```no_run
-/// # use raptor::{RaptorCachePool, SecondOfDay, Timetable};
-/// # fn ex<T: Timetable + Sync>(tt: &T, queries: &[(raptor::StopIdx, raptor::StopIdx)]) {
+/// # use vulture::{RaptorCachePool, SecondOfDay, Timetable};
+/// # fn ex<T: Timetable + Sync>(tt: &T, queries: &[(vulture::StopIdx, vulture::StopIdx)]) {
 /// let pool = RaptorCachePool::for_timetable(tt);
 /// // Sequential or parallel — same code:
 /// for &(start, end) in queries {

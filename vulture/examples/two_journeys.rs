@@ -1,5 +1,5 @@
-use raptor::Duration;
-use raptor::{RouteIdx, SecondOfDay, StopIdx, Timetable, TripIdx};
+use vulture::Duration;
+use vulture::{RouteIdx, SecondOfDay, StopIdx, Timetable, TripIdx};
 
 const R0_STOPS: [StopIdx; 10] = [
     StopIdx::new(0),

@@ -14,8 +14,8 @@
 //! ```no_run
 //! use gtfs_structures::Gtfs;
 //! use jiff::civil::date;
-//! use raptor::{SecondOfDay, Timetable};
-//! use raptor::gtfs::GtfsTimetable;
+//! use vulture::{SecondOfDay, Timetable};
+//! use vulture::gtfs::GtfsTimetable;
 //!
 //! # fn main() -> anyhow::Result<()> {
 //! let gtfs = Gtfs::new("path/to/gtfs.zip")?;
@@ -125,7 +125,7 @@
 //!   adapters that violate the no-overtaking contract documented on
 //!   the trait will likely produce wrong answers rather than panic.
 //!
-//! There is no all-encompassing `raptor::Error` enum — each failure
+//! There is no all-encompassing `vulture::Error` enum — each failure
 //! lives at a clear boundary, so unifying them would lose information
 //! rather than add it.
 //!
