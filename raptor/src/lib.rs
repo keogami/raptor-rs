@@ -1175,8 +1175,7 @@ fn extract_target_journeys<L: Label>(
     for &(target, walk) in targets {
         #[allow(clippy::needless_range_loop)]
         for k in 1..=transfers {
-            let bag_snapshot: SmallVec<[L; 8]> = labels[k][target.idx()].iter().copied().collect();
-            for raw_label in &bag_snapshot {
+            for raw_label in labels[k][target.idx()].iter() {
                 let raw_arr = raw_label.arrival();
                 if raw_arr == SecondOfDay::MAX {
                     continue;
