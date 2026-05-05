@@ -100,6 +100,75 @@ fn layer3_matches_reference(tc: hegel::TestCase) {
     run_property(&tc, &spec);
 }
 
+/// `Query::run_par()` (parallel range query) must produce byte-identical
+/// output to the serial `.run()` for any generated spec. Catches: pool
+/// checkout/return races, per-departure state leakage between cache reuses,
+/// and any non-determinism leaking out of Rayon's `collect`. Uses
+/// `layer1_bounds` to keep the per-case cost low — algorithm correctness
+/// is already covered by the layer1/2/3 reference comparisons; this
+/// property is parallel-vs-serial parity, which doesn't need large specs.
+#[hegel::test]
+fn parallel_range_matches_serial(tc: hegel::TestCase) {
+    use raptor::RaptorCachePool;
+
+    let spec = tc.draw(spec::network_spec(spec::layer1_bounds()));
+    let timetable = spec::render(&spec);
+    let ps = timetable.stop_idx_of(&spec.query.ps);
+    let pt = timetable.stop_idx_of(&spec.query.pt);
+
+    // Three-departure window around tau. Saturating sub ensures we
+    // stay non-negative even for tau == 0.
+    let tau = spec.query.tau as u32;
+    let step: u32 = 5;
+    let departures: Vec<SecondOfDay> = (0..3)
+        .map(|i| SecondOfDay(tau.saturating_sub(i * step)))
+        .collect();
+
+    let serial = timetable
+        .query()
+        .from(&[(ps, Duration::ZERO)])
+        .to(&[(pt, Duration::ZERO)])
+        .max_transfers(spec.query.max_transfers as usize as u8)
+        .depart_in_window(departures.iter().copied())
+        .run();
+
+    let parallel = timetable
+        .query()
+        .from(&[(ps, Duration::ZERO)])
+        .to(&[(pt, Duration::ZERO)])
+        .max_transfers(spec.query.max_transfers as usize as u8)
+        .depart_in_window(departures.iter().copied())
+        .run_par();
+
+    let pool = RaptorCachePool::for_timetable(&timetable);
+    let pooled = timetable
+        .query()
+        .from(&[(ps, Duration::ZERO)])
+        .to(&[(pt, Duration::ZERO)])
+        .max_transfers(spec.query.max_transfers as usize as u8)
+        .depart_in_window(departures.iter().copied())
+        .run_with_pool(&pool);
+
+    if serial.len() != parallel.len() || serial.len() != pooled.len() {
+        tc.note(&format!("spec: {:#?}", spec));
+        tc.note(&format!("departures: {:?}", departures));
+        tc.note(&format!("serial:   {:?}", serial));
+        tc.note(&format!("parallel: {:?}", parallel));
+        tc.note(&format!("pooled:   {:?}", pooled));
+    }
+    assert_eq!(serial.len(), parallel.len(), "run_par length mismatch");
+    assert_eq!(serial.len(), pooled.len(), "run_with_pool length mismatch");
+
+    for ((s, p), pool_entry) in serial.iter().zip(&parallel).zip(&pooled) {
+        assert_eq!(s.depart, p.depart);
+        assert_eq!(s.depart, pool_entry.depart);
+        assert_eq!(s.journey.arrival(), p.journey.arrival());
+        assert_eq!(s.journey.arrival(), pool_entry.journey.arrival());
+        assert_eq!(s.journey.plan.len(), p.journey.plan.len());
+        assert_eq!(s.journey.plan.len(), pool_entry.journey.plan.len());
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
