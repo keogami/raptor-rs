@@ -49,11 +49,11 @@ impl Timetable for SingleRoute {
     }
 
     fn get_arrival_time(&self, _trip: TripIdx, pos: u32) -> Tau {
-        (pos as Tau) * 10
+        Tau(pos * 10)
     }
 
     fn get_departure_time(&self, _trip: TripIdx, pos: u32) -> Tau {
-        (pos as Tau) * 10 + 5
+        Tau(pos * 10 + 5)
     }
 
     fn get_footpaths_from(&self, _stop: StopIdx) -> &[StopIdx] {
@@ -74,7 +74,7 @@ fn main() {
     let mock = SingleRoute;
     let journey = mock.raptor(
         10,
-        0,
+        Tau(0),
         &[(StopIdx::new(0), raptor::Duration::ZERO)],
         &[(StopIdx::new(9), raptor::Duration::ZERO)],
     );

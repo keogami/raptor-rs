@@ -1,8 +1,8 @@
 use criterion::{BenchmarkId, Criterion, criterion_group, criterion_main};
 use gtfs_structures::Gtfs;
 use jiff::civil::{Date, date};
-use raptor::Duration;
 use raptor::gtfs::GtfsTimetable;
+use raptor::{Duration, Tau};
 use raptor::{RaptorCache, Timetable};
 use std::hint::black_box;
 

@@ -18,7 +18,7 @@ use raptor::{RaptorCache, Tau, Timetable};
 use std::path::Path;
 use std::time::Instant;
 
-const DEPARTURE_TIME: Tau = 9 * 3600;
+const DEPARTURE_TIME: Tau = Tau(9 * 3600);
 const QUERY_REPEATS: usize = 50;
 
 struct FeedSpec {
@@ -233,7 +233,7 @@ fn main() -> anyhow::Result<()> {
             let median = samples_ns[samples_ns.len() / 2];
             let arrival_str = match last_arrival {
                 Some(t) if t >= DEPARTURE_TIME => {
-                    let travel = t - DEPARTURE_TIME;
+                    let travel = (t - DEPARTURE_TIME).0;
                     format!("{}m {}s (arr {})", travel / 60, travel % 60, format_hms(t))
                 }
                 Some(t) => format!(
@@ -291,9 +291,7 @@ fn resolve_endpoint(
 }
 
 fn format_hms(t: Tau) -> String {
-    let h = t / 3600;
-    let m = (t % 3600) / 60;
-    let s = t % 60;
+    let (h, m, s) = t.as_hms();
     format!("{h:02}:{m:02}:{s:02}")
 }
 

@@ -90,15 +90,15 @@ impl Timetable for TwoRoutes {
     fn get_arrival_time(&self, trip: TripIdx, pos: u32) -> Tau {
         if trip.get() == 0 {
             // R0 trip: arrival at pos n is the stop_id (also n) * 10
-            R0_STOPS[pos as usize].get() as Tau * 10
+            Tau(R0_STOPS[pos as usize].get() * 10)
         } else {
             // R1 trip: arrival at position p is (p + 2) * 10
-            (pos as Tau + 2) * 10
+            Tau((pos + 2) * 10)
         }
     }
 
     fn get_departure_time(&self, trip: TripIdx, pos: u32) -> Tau {
-        self.get_arrival_time(trip, pos) + 5
+        self.get_arrival_time(trip, pos) + Duration(5)
     }
 
     fn get_footpaths_from(&self, stop: StopIdx) -> &[StopIdx] {
@@ -126,7 +126,7 @@ fn main() {
     let mock = TwoRoutes;
     let journey = mock.raptor(
         10,
-        0,
+        Tau(0),
         &[(StopIdx::new(1), Duration::ZERO)],
         &[(StopIdx::new(9), Duration::ZERO)],
     );

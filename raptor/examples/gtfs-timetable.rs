@@ -37,7 +37,7 @@ fn main() -> anyhow::Result<()> {
         .stop_idx(target)
         .ok_or_else(|| anyhow::anyhow!("unknown target stop: {target}"))?;
 
-    let departure_time = 19 * 3600 + 15 * 60;
+    let departure_time = raptor::Tau::hms(19, 15, 0);
     let journeys = timetable.raptor(
         10,
         departure_time,
@@ -51,7 +51,7 @@ fn main() -> anyhow::Result<()> {
     }
 
     for (i, journey) in journeys.iter().enumerate() {
-        let travel_time = StdDuration::from_secs((journey.arrival() - departure_time).into());
+        let travel_time = StdDuration::from_secs((journey.arrival() - departure_time).0.into());
         println!("Journey {} ({}):", i + 1, format_duration(travel_time));
         print_journey(&gtfs, &timetable, journey, start);
         println!();

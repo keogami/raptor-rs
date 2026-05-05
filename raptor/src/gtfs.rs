@@ -294,10 +294,10 @@ impl<'gtfs> GtfsTimetable<'gtfs> {
                     let trip = gtfs.get_trip(trip_id).expect("validated above");
                     for (stop_pos, st) in trip.stop_times.iter().enumerate() {
                         if let Some(a) = st.arrival_time {
-                            arr_table[stop_pos][trip_pos] = a;
+                            arr_table[stop_pos][trip_pos] = Tau(a);
                         }
                         let d = st.departure_time.expect("validated at construction");
-                        dep_table[stop_pos][trip_pos] = d;
+                        dep_table[stop_pos][trip_pos] = Tau(d);
                     }
                 }
                 arrival_times.push(arr_table);

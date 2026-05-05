@@ -69,7 +69,7 @@ impl Timetable for ReBoardingTimetable {
             0 => {
                 // R1: dep at pos 0 (S) = 0; pos 1 (A) is alight, irrelevant
                 let dep = match pos {
-                    0 => 0,
+                    0 => Tau(0),
                     _ => return None,
                 };
                 (at <= dep).then_some(R1_T1)
@@ -77,7 +77,7 @@ impl Timetable for ReBoardingTimetable {
             1 => {
                 // R2: dep at pos 0 (S) = 0
                 let dep = match pos {
-                    0 => 0,
+                    0 => Tau(0),
                     _ => return None,
                 };
                 (at <= dep).then_some(R2_T1)
@@ -85,10 +85,10 @@ impl Timetable for ReBoardingTimetable {
             2 => {
                 // R3: pos 0=A dep 25/105, pos 1=B dep 30/110, pos 2=C dep 40/120
                 let (early_dep, late_dep) = match pos {
-                    0 => (25, 105),
-                    1 => (30, 110),
-                    2 => (40, 120),
-                    3 => (50, 130),
+                    0 => (Tau(25), Tau(105)),
+                    1 => (Tau(30), Tau(110)),
+                    2 => (Tau(40), Tau(120)),
+                    3 => (Tau(50), Tau(130)),
                     _ => return None,
                 };
                 if at <= early_dep {
@@ -105,28 +105,28 @@ impl Timetable for ReBoardingTimetable {
 
     fn get_arrival_time(&self, trip: TripIdx, pos: u32) -> Tau {
         match (trip.get(), pos) {
-            (0, 1) => 100, // R1_T1 at A
-            (1, 1) => 30,  // R2_T1 at B
-            (3, 1) => 110,
-            (3, 2) => 120,
-            (3, 3) => 130, // R3_LATE
-            (2, 1) => 30,
-            (2, 2) => 40,
-            (2, 3) => 50, // R3_EARLY
+            (0, 1) => Tau(100), // R1_T1 at A
+            (1, 1) => Tau(30),  // R2_T1 at B
+            (3, 1) => Tau(110),
+            (3, 2) => Tau(120),
+            (3, 3) => Tau(130), // R3_LATE
+            (2, 1) => Tau(30),
+            (2, 2) => Tau(40),
+            (2, 3) => Tau(50), // R3_EARLY
             _ => Tau::MAX,
         }
     }
 
     fn get_departure_time(&self, trip: TripIdx, pos: u32) -> Tau {
         match (trip.get(), pos) {
-            (0, 0) => 0, // R1_T1 at S
-            (1, 0) => 0, // R2_T1 at S
-            (3, 0) => 105,
-            (3, 1) => 110,
-            (3, 2) => 120, // R3_LATE
-            (2, 0) => 25,
-            (2, 1) => 30,
-            (2, 2) => 40, // R3_EARLY
+            (0, 0) => Tau(0), // R1_T1 at S
+            (1, 0) => Tau(0), // R2_T1 at S
+            (3, 0) => Tau(105),
+            (3, 1) => Tau(110),
+            (3, 2) => Tau(120), // R3_LATE
+            (2, 0) => Tau(25),
+            (2, 1) => Tau(30),
+            (2, 2) => Tau(40), // R3_EARLY
             _ => Tau::MAX,
         }
     }
@@ -146,7 +146,7 @@ fn main() {
     println!("Expected: S --(R2)--> B --(R3/early)--> D, arrives @ t=50\n");
 
     let timetable = ReBoardingTimetable;
-    let journeys = timetable.raptor(3, 0, &[(S, Duration::ZERO)], &[(D, Duration::ZERO)]);
+    let journeys = timetable.raptor(3, Tau(0), &[(S, Duration::ZERO)], &[(D, Duration::ZERO)]);
 
     println!("{journeys:#?}");
 }

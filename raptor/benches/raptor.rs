@@ -1,7 +1,7 @@
 use criterion::{BenchmarkId, Criterion, criterion_group, criterion_main};
-use raptor::Duration;
 use raptor::Timetable;
 use raptor::simple::builders::*;
+use raptor::{Duration, Tau};
 
 /// Routes from the first stop to the last on a single route. Tests how performance
 /// scales as the number of stops and trips on one route grows. (explained by llm)
@@ -18,7 +18,7 @@ fn bench_linear(c: &mut Criterion) {
                 b.iter(|| {
                     tt.raptor(
                         3,
-                        0,
+                        Tau(0),
                         &[(source, Duration::ZERO)],
                         &[(target, Duration::ZERO)],
                     )
@@ -50,7 +50,7 @@ fn bench_grid(c: &mut Criterion) {
                 b.iter(|| {
                     tt.raptor(
                         5,
-                        0,
+                        Tau(0),
                         &[(source, Duration::ZERO)],
                         &[(target, Duration::ZERO)],
                     )
@@ -84,7 +84,7 @@ fn bench_hub_spoke(c: &mut Criterion) {
                 b.iter(|| {
                     tt.raptor(
                         5,
-                        0,
+                        Tau(0),
                         &[(source, Duration::ZERO)],
                         &[(target, Duration::ZERO)],
                     )
@@ -107,7 +107,7 @@ fn bench_transfer_scaling(c: &mut Criterion) {
             b.iter(|| {
                 tt.raptor(
                     k,
-                    0,
+                    Tau(0),
                     &[(source, Duration::ZERO)],
                     &[(target, Duration::ZERO)],
                 )
@@ -133,7 +133,7 @@ fn bench_reconstruction_depth(c: &mut Criterion) {
                 b.iter(|| {
                     tt.raptor(
                         segments + 1,
-                        0,
+                        Tau(0),
                         &[(source, Duration::ZERO)],
                         &[(target, Duration::ZERO)],
                     )
@@ -160,7 +160,7 @@ fn bench_reconstruction_breadth(c: &mut Criterion) {
                 b.iter(|| {
                     tt.raptor(
                         max_legs + 1,
-                        0,
+                        Tau(0),
                         &[(source, Duration::ZERO)],
                         &[(target, Duration::ZERO)],
                     )

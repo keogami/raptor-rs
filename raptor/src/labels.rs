@@ -72,7 +72,7 @@ impl Label for ArrivalAndWalk {
     #[inline]
     fn extend_by_footpath(self, walk: Duration) -> Self {
         ArrivalAndWalk {
-            arrival: self.arrival.saturating_add(walk.0),
+            arrival: self.arrival + walk,
             walk_time: self.walk_time + walk,
         }
     }

@@ -88,13 +88,13 @@ pub fn render(spec: &NetworkSpec) -> SimpleTimetable<u8, u8, u16> {
             assert_eq!(trip.dwell_times.len(), stops.len());
 
             let mut times: Vec<(raptor::Tau, raptor::Tau)> = Vec::with_capacity(stops.len());
-            let arr0 = trip.first_dep as raptor::Tau;
-            let dep0 = arr0 + trip.dwell_times[0] as raptor::Tau;
+            let arr0 = raptor::Tau(trip.first_dep as u32);
+            let dep0 = arr0 + raptor::Duration(trip.dwell_times[0] as u32);
             times.push((arr0, dep0));
             for i in 1..stops.len() {
                 let prev_dep = times[i - 1].1;
-                let arr = prev_dep + trip.leg_durations[i - 1] as raptor::Tau;
-                let dep = arr + trip.dwell_times[i] as raptor::Tau;
+                let arr = prev_dep + raptor::Duration(trip.leg_durations[i - 1] as u32);
+                let dep = arr + raptor::Duration(trip.dwell_times[i] as u32);
                 times.push((arr, dep));
             }
 
@@ -256,11 +256,13 @@ fn render_single_route_two_stops_one_trip() {
     assert_eq!(routes_at_0, &[(r0, 0)]);
 
     // Position 0 of route r0 corresponds to stop 0; position 1 to stop 1.
-    let trip = tt.get_earliest_trip(r0, 0, 0).expect("trip exists");
-    assert_eq!(tt.get_arrival_time(trip, 0), 100);
-    assert_eq!(tt.get_departure_time(trip, 0), 105);
-    assert_eq!(tt.get_arrival_time(trip, 1), 125);
-    assert_eq!(tt.get_departure_time(trip, 1), 125);
+    let trip = tt
+        .get_earliest_trip(r0, raptor::Tau::ZERO, 0)
+        .expect("trip exists");
+    assert_eq!(tt.get_arrival_time(trip, 0), raptor::Tau(100));
+    assert_eq!(tt.get_departure_time(trip, 0), raptor::Tau(105));
+    assert_eq!(tt.get_arrival_time(trip, 1), raptor::Tau(125));
+    assert_eq!(tt.get_departure_time(trip, 1), raptor::Tau(125));
 }
 
 #[test]

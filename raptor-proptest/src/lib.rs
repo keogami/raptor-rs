@@ -31,7 +31,7 @@ pub fn raptor_front(journeys: &[Journey]) -> BTreeSet<(u16, u8)> {
     let mut points: Vec<(u16, u8)> = journeys
         .iter()
         .map(|j| {
-            let arr = u16::try_from(j.arrival())
+            let arr = u16::try_from(j.arrival().0)
                 .expect("arrival exceeds u16::MAX — generator range exceeded?");
             let k = u8::try_from(j.plan.len())
                 .expect("plan length exceeds u8::MAX — should never happen");
@@ -51,7 +51,7 @@ pub fn raptor_front(journeys: &[Journey]) -> BTreeSet<(u16, u8)> {
 }
 
 #[cfg(test)]
-use raptor::{Duration, Timetable};
+use raptor::{Duration, Tau, Timetable};
 
 #[cfg(test)]
 fn run_property(tc: &hegel::TestCase, spec: &spec::NetworkSpec) {
@@ -60,7 +60,7 @@ fn run_property(tc: &hegel::TestCase, spec: &spec::NetworkSpec) {
     let pt_idx = timetable.stop_idx_of(&spec.query.pt);
     let ours = timetable.raptor(
         spec.query.max_transfers as usize,
-        spec.query.tau as u32,
+        Tau(spec.query.tau as u32),
         &[(ps_idx, Duration::ZERO)],
         &[(pt_idx, Duration::ZERO)],
     );
@@ -112,7 +112,7 @@ mod tests {
                 .into_iter()
                 .map(|(r, s)| (RouteIdx::new(r), StopIdx::new(s)))
                 .collect(),
-            label: ArrivalTime(arrival),
+            label: ArrivalTime(Tau(arrival)),
         }
     }
 

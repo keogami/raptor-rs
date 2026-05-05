@@ -87,15 +87,86 @@ mod test;
 pub(crate) type K = usize;
 
 /// A point in time, in seconds since midnight on the timetable's
-/// service date. Type-aliased to `u32` (the day is 86,400 seconds;
-/// `u32` covers feed quirks like trips encoded past 24h with room
-/// to spare).
+/// service date. Wraps a `u32` — the day is 86,400 seconds; `u32`
+/// covers feed quirks like trips encoded past 24h with room to spare.
 ///
 /// Tau is a *timestamp*. A *length* of time — walk-time offset,
 /// transfer time, dwell time — is a [`Duration`], a distinct type.
 /// The trait surface uses both consistently so they can't be
 /// silently confused.
-pub type Tau = u32;
+///
+/// Construct via [`Tau::ZERO`], [`Tau::from_secs`], [`Tau::hms`], or
+/// the public-field constructor `Tau(n)`. Extract via
+/// [`Tau::as_secs`] / [`Tau::as_hms`]. Arithmetic with [`Duration`]
+/// is saturating: `Tau::MAX + Duration::MAX` stays at `Tau::MAX`.
+#[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Default)]
+pub struct Tau(pub u32);
+
+impl Tau {
+    /// Midnight (0 seconds since the start of the service day).
+    pub const ZERO: Tau = Tau(0);
+    /// Sentinel for "unreached". The algorithm uses this internally
+    /// for empty `(round, stop)` cells.
+    pub const MAX: Tau = Tau(u32::MAX);
+
+    /// Construct from a raw seconds-since-midnight count.
+    pub const fn from_secs(s: u32) -> Self {
+        Tau(s)
+    }
+
+    /// Construct from `(hours, minutes, seconds)`.
+    pub const fn hms(h: u32, m: u32, s: u32) -> Self {
+        Tau(h * 3600 + m * 60 + s)
+    }
+
+    /// The underlying `u32` — seconds since midnight.
+    pub const fn as_secs(self) -> u32 {
+        self.0
+    }
+
+    /// `(hours, minutes, seconds)` decomposition.
+    pub const fn as_hms(self) -> (u32, u32, u32) {
+        (self.0 / 3600, (self.0 / 60) % 60, self.0 % 60)
+    }
+}
+
+impl From<u32> for Tau {
+    fn from(s: u32) -> Self {
+        Tau(s)
+    }
+}
+
+impl fmt::Display for Tau {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        self.0.fmt(f)
+    }
+}
+
+impl std::ops::Add<Duration> for Tau {
+    /// `Tau + Duration` advances the timestamp; saturating on overflow.
+    type Output = Tau;
+    fn add(self, d: Duration) -> Tau {
+        Tau(self.0.saturating_add(d.0))
+    }
+}
+
+impl std::ops::Sub<Tau> for Tau {
+    /// `Tau - Tau` is the [`Duration`] between them, saturating at
+    /// [`Duration::ZERO`] if `self < other`.
+    type Output = Duration;
+    fn sub(self, other: Tau) -> Duration {
+        Duration(self.0.saturating_sub(other.0))
+    }
+}
+
+impl std::ops::Sub<Duration> for Tau {
+    /// `Tau - Duration` rewinds the timestamp; saturating at
+    /// [`Tau::ZERO`] on underflow.
+    type Output = Tau;
+    fn sub(self, d: Duration) -> Tau {
+        Tau(self.0.saturating_sub(d.0))
+    }
+}
 
 /// A length of time, in seconds. Distinct from [`Tau`] (a point in
 /// time) so the algorithm signatures can express which kind they
@@ -517,7 +588,7 @@ impl Label for ArrivalTime {
 
     #[inline]
     fn extend_by_footpath(self, walk_time: Duration) -> Self {
-        ArrivalTime(self.0.saturating_add(walk_time.0))
+        ArrivalTime(self.0 + walk_time)
     }
 
     #[inline]
@@ -608,10 +679,10 @@ impl<L: Label> Journey<L> {
         &self,
         tt: &T,
         tau: Tau,
-        origin_walk: Tau,
+        origin_walk: Duration,
     ) -> Option<Vec<TimedLeg>> {
         let mut legs = Vec::with_capacity(self.plan.len());
-        let mut current_time = tau.saturating_add(origin_walk);
+        let mut current_time = tau + origin_walk;
         let mut current_stop = self.origin;
 
         for &(route, alight) in &self.plan {
@@ -641,7 +712,7 @@ impl<L: Label> Journey<L> {
                     found?
                 };
 
-            current_time = current_time.saturating_add(walk_time.0);
+            current_time = current_time + walk_time;
 
             let trip = tt.get_earliest_trip(route, current_time, board_pos)?;
             let depart = tt.get_departure_time(trip, board_pos);
@@ -965,7 +1036,7 @@ fn best_to_any_target<L: Label>(
 ) -> Tau {
     targets
         .iter()
-        .map(|&(t, w)| best_arrival[t.idx()].min_arrival().saturating_add(w.0))
+        .map(|&(t, w)| best_arrival[t.idx()].min_arrival() + w)
         .min()
         .unwrap_or(Tau::MAX)
 }
@@ -1255,7 +1326,7 @@ pub trait Timetable {
         // Reconstruction breaks the trace loop when it hits an origin
         // (origin_set bit is set), so origins don't need a Step entry.
         for &(o, walk) in origins {
-            let t = tau.saturating_add(walk.0);
+            let t = tau + walk;
             let seed = L::from_departure(t);
             if labels[0][o.idx()].insert(seed) {
                 best_arrival[o.idx()].insert(seed);
