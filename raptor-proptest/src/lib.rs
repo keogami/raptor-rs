@@ -58,12 +58,13 @@ fn run_property(tc: &hegel::TestCase, spec: &spec::NetworkSpec) {
     let timetable = spec::render(spec);
     let ps_idx = timetable.stop_idx_of(&spec.query.ps);
     let pt_idx = timetable.stop_idx_of(&spec.query.pt);
-    let ours = timetable.raptor(
-        spec.query.max_transfers as usize,
-        Tau(spec.query.tau as u32),
-        &[(ps_idx, Duration::ZERO)],
-        &[(pt_idx, Duration::ZERO)],
-    );
+    let ours = timetable
+        .query()
+        .from(&[(ps_idx, Duration::ZERO)])
+        .to(&[(pt_idx, Duration::ZERO)])
+        .max_transfers(spec.query.max_transfers as usize as u8)
+        .depart_at(Tau(spec.query.tau as u32))
+        .run();
     let theirs = reference::reference_solve(
         spec,
         spec.query.ps,

@@ -65,13 +65,13 @@ fn bench_gtfs_query(c: &mut Criterion) {
             &(start, target),
             |b, &(start, target)| {
                 b.iter(|| {
-                    let journeys = timetable.raptor_with_cache(
-                        &mut cache,
-                        10,
-                        DEPARTURE_TIME,
-                        &[(start, Duration::ZERO)],
-                        &[(target, Duration::ZERO)],
-                    );
+                    let journeys = timetable
+                        .query()
+                        .from(&[(start, Duration::ZERO)])
+                        .to(&[(target, Duration::ZERO)])
+                        .max_transfers(10u8)
+                        .depart_at(DEPARTURE_TIME)
+                        .run_with_cache(&mut cache);
                     black_box(&journeys);
                 });
             },

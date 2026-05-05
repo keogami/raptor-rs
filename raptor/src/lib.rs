@@ -1225,63 +1225,6 @@ pub trait Timetable {
     /// effective arrival = `arrival_at_target_stop + walk_time`.
     ///
     /// For a single-stop query, pass `&[(stop, 0)]`. For a station with
-    /// multiple platforms, pass each platform with its walk time from the
-    /// station entrance (often 0 if the user is willing to use any
-    /// platform). Multi-source/multi-target also fits geocoding: pass all
-    /// nearby stops with their walking times from the user's GPS.
-    ///
-    /// Allocates fresh scratch buffers on every call. For server use cases
-    /// running thousands of queries against the same timetable, prefer
-    /// [`Timetable::raptor_with_cache`] and reuse a [`RaptorCache`].
-    fn raptor(
-        &self,
-        transfers: usize,
-        tau: Tau,
-        origins: impl IntoEndpoints,
-        targets: impl IntoEndpoints,
-    ) -> Vec<Journey>
-    where
-        Self: Sized,
-    {
-        self.raptor_with_label::<ArrivalTime>(transfers, tau, origins, targets)
-    }
-
-    /// Generic variant of [`Timetable::raptor`] over a custom
-    /// [`Label`] type. Use this when you've implemented your own
-    /// label (e.g. for accumulated walking time) and want to drive
-    /// the algorithm with it. Single-criterion users want
-    /// [`Timetable::raptor`].
-    fn raptor_with_label<L: Label>(
-        &self,
-        transfers: usize,
-        tau: Tau,
-        origins: impl IntoEndpoints,
-        targets: impl IntoEndpoints,
-    ) -> Vec<Journey<L>>
-    where
-        Self: Sized,
-    {
-        let mut cache = RaptorCache::<L>::for_timetable(self);
-        self.raptor_with_cache_and_label(&mut cache, transfers, tau, origins, targets)
-    }
-
-    /// Same as [`Timetable::raptor`], but reuses scratch buffers from
-    /// `cache`. The cache is reset at the start of the call. Panics if the
-    /// cache was sized for a different timetable.
-    fn raptor_with_cache(
-        &self,
-        cache: &mut RaptorCache,
-        transfers: usize,
-        tau: Tau,
-        origins: impl IntoEndpoints,
-        targets: impl IntoEndpoints,
-    ) -> Vec<Journey>
-    where
-        Self: Sized,
-    {
-        self.raptor_with_cache_and_label::<ArrivalTime>(cache, transfers, tau, origins, targets)
-    }
-
     /// Start a typestate-builder query. Returns a [`Query`] in the
     /// [`NeedsDeparture`] state. Call `.from(...).to(...).max_transfers(...)`
     /// (any order, all optional with defaults), then either
@@ -1331,10 +1274,11 @@ pub trait Timetable {
         }
     }
 
-    /// Generic variant of [`Timetable::raptor_with_cache`] over a
-    /// custom [`Label`] type. The label parameter `L` is inferred
-    /// from `cache: &mut RaptorCache<L>`, so callers don't need to
-    /// turbofish.
+    /// Implementation entry point for [`Query::run`] /
+    /// [`Query::run_with_cache`]. Public-but-hidden so the typestate
+    /// builder can dispatch into the algorithm. Don't call this
+    /// directly — use [`Timetable::query`] instead.
+    #[doc(hidden)]
     fn raptor_with_cache_and_label<L: Label>(
         &self,
         cache: &mut RaptorCache<L>,
@@ -1637,47 +1581,18 @@ pub trait Timetable {
         front
     }
 
-    /// Range query — runs [`Timetable::raptor`] for each departure
-    /// time in `departures` and returns a Pareto profile of
-    /// `(depart, journey)` pairs across the whole window.
+    /// Implementation entry point for [`Query::run`] in the
+    /// [`RangeDeparture`] state. Public-but-hidden so the typestate
+    /// builder can dispatch into the algorithm. Don't call this
+    /// directly — use [`Timetable::query`]`.depart_in_window(...)`
+    /// instead.
     ///
-    /// **Status (v0.13):** naïve batch implementation — calls the
-    /// per-departure algorithm once per `departures` entry, sharing
-    /// only the `RaptorCache`. The full rRAPTOR algorithm (one
-    /// reverse-chronological scan that shares state across departure
-    /// events) is queued for v0.14+. Output shape is intentionally
-    /// the one rRAPTOR will produce, so callers writing against this
-    /// API today won't have to migrate.
-    ///
-    /// `departures` is `IntoIterator<Item = Tau>` — pass any range,
-    /// `Vec<Tau>`, or other iterator. Common pattern:
-    /// `(t_start..t_end).step_by(60)` for one query per minute.
-    ///
-    /// The returned [`RangeJourney`]s are Pareto-optimal on the
-    /// triple `(later departure, fewer transfers, dominated label)`.
-    /// Concretely: for any two returned entries, neither has all of
-    /// (departure ≥, plan.len ≤, label.dominates) holding — so a
-    /// caller can read the result as a true profile.
-    fn raptor_range(
-        &self,
-        transfers: usize,
-        departures: impl IntoIterator<Item = Tau>,
-        origins: impl IntoEndpoints,
-        targets: impl IntoEndpoints,
-    ) -> Vec<RangeJourney>
-    where
-        Self: Sized,
-    {
-        let mut cache = RaptorCache::<ArrivalTime>::for_timetable(self);
-        self.raptor_range_with_cache(&mut cache, transfers, departures, origins, targets)
-    }
-
-    /// Same as [`Timetable::raptor_range`] but reuses scratch buffers
-    /// from `cache` across every per-departure call. Generic over
-    /// `L: Label` via the cache (the label parameter is inferred,
-    /// no turbofish needed). For server workloads doing many range
-    /// queries against the same timetable, this is the right entry
-    /// point.
+    /// Naïve batch implementation today: calls the per-departure
+    /// algorithm once per `departures` entry, sharing only the
+    /// `RaptorCache`. A real rRAPTOR (reverse-chronological scan
+    /// reusing labels across departure events) is queued; the
+    /// output shape is intentionally the one rRAPTOR will produce.
+    #[doc(hidden)]
     fn raptor_range_with_cache<L: Label>(
         &self,
         cache: &mut RaptorCache<L>,

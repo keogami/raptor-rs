@@ -16,12 +16,12 @@ fn bench_linear(c: &mut Criterion) {
                 let source = tt.stop_idx_of(&0usize);
                 let target = tt.stop_idx_of(&(stops - 1));
                 b.iter(|| {
-                    tt.raptor(
-                        3,
-                        Tau(0),
-                        &[(source, Duration::ZERO)],
-                        &[(target, Duration::ZERO)],
-                    )
+                    tt.query()
+                        .from(&[(source, Duration::ZERO)])
+                        .to(&[(target, Duration::ZERO)])
+                        .max_transfers(3u8)
+                        .depart_at(Tau(0))
+                        .run()
                 })
             },
         );
@@ -48,12 +48,12 @@ fn bench_grid(c: &mut Criterion) {
                 let source = tt.stop_idx_of(&source_key);
                 let target = tt.stop_idx_of(&target_key);
                 b.iter(|| {
-                    tt.raptor(
-                        5,
-                        Tau(0),
-                        &[(source, Duration::ZERO)],
-                        &[(target, Duration::ZERO)],
-                    )
+                    tt.query()
+                        .from(&[(source, Duration::ZERO)])
+                        .to(&[(target, Duration::ZERO)])
+                        .max_transfers(5u8)
+                        .depart_at(Tau(0))
+                        .run()
                 })
             },
         );
@@ -82,12 +82,12 @@ fn bench_hub_spoke(c: &mut Criterion) {
                 let source = tt.stop_idx_of(&source_key);
                 let target = tt.stop_idx_of(&target_key);
                 b.iter(|| {
-                    tt.raptor(
-                        5,
-                        Tau(0),
-                        &[(source, Duration::ZERO)],
-                        &[(target, Duration::ZERO)],
-                    )
+                    tt.query()
+                        .from(&[(source, Duration::ZERO)])
+                        .to(&[(target, Duration::ZERO)])
+                        .max_transfers(5u8)
+                        .depart_at(Tau(0))
+                        .run()
                 })
             },
         );
@@ -105,12 +105,12 @@ fn bench_transfer_scaling(c: &mut Criterion) {
     for k in [1, 3, 5, 10, 20] {
         group.bench_with_input(BenchmarkId::new("raptor", format!("k{k}")), &k, |b, &k| {
             b.iter(|| {
-                tt.raptor(
-                    k,
-                    Tau(0),
-                    &[(source, Duration::ZERO)],
-                    &[(target, Duration::ZERO)],
-                )
+                tt.query()
+                    .from(&[(source, Duration::ZERO)])
+                    .to(&[(target, Duration::ZERO)])
+                    .max_transfers(k as u8)
+                    .depart_at(Tau(0))
+                    .run()
             })
         });
     }
@@ -131,12 +131,12 @@ fn bench_reconstruction_depth(c: &mut Criterion) {
                 let source = tt.stop_idx_of(&0usize);
                 let target = tt.stop_idx_of(&segments);
                 b.iter(|| {
-                    tt.raptor(
-                        segments + 1,
-                        Tau(0),
-                        &[(source, Duration::ZERO)],
-                        &[(target, Duration::ZERO)],
-                    )
+                    tt.query()
+                        .from(&[(source, Duration::ZERO)])
+                        .to(&[(target, Duration::ZERO)])
+                        .max_transfers((segments + 1) as u8)
+                        .depart_at(Tau(0))
+                        .run()
                 })
             },
         );
@@ -158,12 +158,12 @@ fn bench_reconstruction_breadth(c: &mut Criterion) {
                 let source = tt.stop_idx_of(&0usize);
                 let target = tt.stop_idx_of(&1usize);
                 b.iter(|| {
-                    tt.raptor(
-                        max_legs + 1,
-                        Tau(0),
-                        &[(source, Duration::ZERO)],
-                        &[(target, Duration::ZERO)],
-                    )
+                    tt.query()
+                        .from(&[(source, Duration::ZERO)])
+                        .to(&[(target, Duration::ZERO)])
+                        .max_transfers((max_legs + 1) as u8)
+                        .depart_at(Tau(0))
+                        .run()
                 })
             },
         );

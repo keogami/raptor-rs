@@ -38,12 +38,13 @@ fn main() -> anyhow::Result<()> {
         .ok_or_else(|| anyhow::anyhow!("unknown target stop: {target}"))?;
 
     let departure_time = raptor::Tau::hms(19, 15, 0);
-    let journeys = timetable.raptor(
-        10,
-        departure_time,
-        &[(start_idx, Duration::ZERO)],
-        &[(target_idx, Duration::ZERO)],
-    );
+    let journeys = timetable
+        .query()
+        .from(&[(start_idx, Duration::ZERO)])
+        .to(&[(target_idx, Duration::ZERO)])
+        .max_transfers(10u8)
+        .depart_at(departure_time)
+        .run();
 
     if journeys.is_empty() {
         println!("No journeys found.");

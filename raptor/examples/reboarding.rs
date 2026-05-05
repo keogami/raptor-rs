@@ -146,7 +146,13 @@ fn main() {
     println!("Expected: S --(R2)--> B --(R3/early)--> D, arrives @ t=50\n");
 
     let timetable = ReBoardingTimetable;
-    let journeys = timetable.raptor(3, Tau(0), &[(S, Duration::ZERO)], &[(D, Duration::ZERO)]);
+    let journeys = timetable
+        .query()
+        .from(&[(S, Duration::ZERO)])
+        .to(&[(D, Duration::ZERO)])
+        .max_transfers(3u8)
+        .depart_at(Tau(0))
+        .run();
 
     println!("{journeys:#?}");
 }

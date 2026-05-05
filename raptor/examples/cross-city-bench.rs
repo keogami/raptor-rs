@@ -213,8 +213,13 @@ fn main() -> anyhow::Result<()> {
 
             // Warm up.
             for _ in 0..3 {
-                let _ =
-                    timetable.raptor_with_cache(&mut cache, 10, DEPARTURE_TIME, &origins, &targets);
+                let _ = timetable
+                    .query()
+                    .from(&origins)
+                    .to(&targets)
+                    .max_transfers(10u8)
+                    .depart_at(DEPARTURE_TIME)
+                    .run_with_cache(&mut cache);
             }
 
             // Measure.
@@ -223,8 +228,13 @@ fn main() -> anyhow::Result<()> {
             let mut last_journey_count: usize = 0;
             for _ in 0..QUERY_REPEATS {
                 let t0 = Instant::now();
-                let journeys =
-                    timetable.raptor_with_cache(&mut cache, 10, DEPARTURE_TIME, &origins, &targets);
+                let journeys = timetable
+                    .query()
+                    .from(&origins)
+                    .to(&targets)
+                    .max_transfers(10u8)
+                    .depart_at(DEPARTURE_TIME)
+                    .run_with_cache(&mut cache);
                 samples_ns.push(t0.elapsed().as_nanos());
                 last_journey_count = journeys.len();
                 last_arrival = journeys.iter().map(|j| j.arrival()).min();

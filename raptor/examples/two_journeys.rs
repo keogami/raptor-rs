@@ -124,12 +124,13 @@ fn main() {
     .init();
 
     let mock = TwoRoutes;
-    let journey = mock.raptor(
-        10,
-        Tau(0),
-        &[(StopIdx::new(1), Duration::ZERO)],
-        &[(StopIdx::new(9), Duration::ZERO)],
-    );
+    let journey = mock
+        .query()
+        .from(&[(StopIdx::new(1), Duration::ZERO)])
+        .to(&[(StopIdx::new(9), Duration::ZERO)])
+        .max_transfers(10u8)
+        .depart_at(Tau(0))
+        .run();
 
     println!("{journey:#?}");
 }

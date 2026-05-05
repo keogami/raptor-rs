@@ -72,12 +72,13 @@ fn main() {
     .init();
 
     let mock = SingleRoute;
-    let journey = mock.raptor(
-        10,
-        Tau(0),
-        &[(StopIdx::new(0), raptor::Duration::ZERO)],
-        &[(StopIdx::new(9), raptor::Duration::ZERO)],
-    );
+    let journey = mock
+        .query()
+        .from(&[(StopIdx::new(0), raptor::Duration::ZERO)])
+        .to(&[(StopIdx::new(9), raptor::Duration::ZERO)])
+        .max_transfers(10u8)
+        .depart_at(Tau(0))
+        .run();
 
     println!("{journey:#?}");
 }
