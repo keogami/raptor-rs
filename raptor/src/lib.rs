@@ -100,6 +100,35 @@
 //! [`manual::SimpleTimetable`] is a hand-rolled in-memory adapter useful for
 //! tests and small fixtures.
 //!
+//! # Errors
+//!
+//! The library uses three patterns, picked per-call to match what the
+//! caller can usefully do:
+//!
+//! - **`Result` for construction.** Building a [`gtfs::GtfsTimetable`]
+//!   from a parsed feed validates many invariants and returns
+//!   [`Result<_, gtfs::GtfsError>`](gtfs::GtfsError). Custom adapters
+//!   should follow the same pattern with their own typed error enum.
+//! - **`Option` for lookups.** Resolving an external ID
+//!   ([`gtfs::GtfsTimetable::stop_idx`], [`gtfs::GtfsTimetable::route_idx`])
+//!   returns `Option` — `None` simply means "not in this timetable".
+//!   Same for any "find me an `X` matching `Y`" accessor; there's no
+//!   useful structured error.
+//! - **`Result` for plan reconstruction.** [`Journey::with_timing`]
+//!   returns [`Result<_, TimingError>`] — failure modes (no boarding
+//!   stop reachable, no catchable trip, alighting stop not on route)
+//!   are surfaced as variants because they carry useful debug context.
+//! - **Panics for programmer-violated invariants.** Passing a
+//!   [`RaptorCache`] sized for one timetable to a query against a
+//!   differently-sized timetable panics — the mistake is unrecoverable
+//!   and the assertion message is the diagnostic. Custom [`Timetable`]
+//!   adapters that violate the no-overtaking contract documented on
+//!   the trait will likely produce wrong answers rather than panic.
+//!
+//! There is no all-encompassing `raptor::Error` enum — each failure
+//! lives at a clear boundary, so unifying them would lose information
+//! rather than add it.
+//!
 //! # Cargo features
 //!
 //! - `parallel` (default-on) — pulls in `rayon`, enables [`Query::run_par`] /
@@ -2165,9 +2194,14 @@ where
         self.run_with_cache(&mut cache)
     }
 
-    /// Execute the query, reusing `cache`. The cache must be sized
-    /// for the same timetable; passing one sized differently panics
-    /// inside `RaptorCache::reset_for_query`.
+    /// Execute the query, reusing `cache`.
+    ///
+    /// # Panics
+    ///
+    /// Panics if `cache` was sized for a different timetable
+    /// (`tt.n_stops()` or `tt.n_routes()` mismatch). Use
+    /// [`RaptorCache::for_timetable`] with the same timetable you call
+    /// the query on to avoid this.
     pub fn run_with_cache(self, cache: &mut RaptorCache<L>) -> Vec<Journey<L>> {
         self.tt.raptor_with_cache_and_label(
             cache,
@@ -2194,6 +2228,11 @@ where
     }
 
     /// Execute the range query, reusing `cache`. Runs rRAPTOR.
+    ///
+    /// # Panics
+    ///
+    /// Panics if `cache` was sized for a different timetable. See
+    /// [`RaptorCache::for_timetable`].
     pub fn run_with_cache(
         self,
         cache: &mut RaptorCache<ArrivalTime>,
@@ -2228,8 +2267,12 @@ where
     }
 
     /// Execute the range query in parallel, reusing caches from `pool`.
-    /// `pool` must be sized for `self`'s timetable; mismatch panics
-    /// inside the per-departure scan.
+    ///
+    /// # Panics
+    ///
+    /// Panics if `pool` was sized for a different timetable
+    /// (mismatch surfaces in the per-departure scan via
+    /// [`RaptorCache::for_timetable`]'s sizing assertion).
     pub fn run_with_pool(self, pool: &RaptorCachePool<L>) -> Vec<RangeJourney<L>> {
         use rayon::prelude::*;
 
@@ -2456,6 +2499,13 @@ impl<L: Label> RaptorCachePool<L> {
     /// Borrow a cache from the pool. Allocates a fresh one if the pool
     /// is empty. The returned guard returns the cache to the pool when
     /// dropped, ready for the next checkout.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the internal mutex is poisoned (i.e. another thread
+    /// panicked while holding it). In normal use this does not occur:
+    /// the lock is only held long enough to pop or push the freelist,
+    /// never across a query.
     pub fn checkout(&self) -> PooledCache<'_, L> {
         let cache = self
             .pool
