@@ -1,4 +1,4 @@
-use raptor::{RouteIdx, StopIdx, Tau, Timetable, TripIdx};
+use raptor::{RouteIdx, SecondOfDay, StopIdx, Timetable, TripIdx};
 
 // a single route with stops [0..10]
 struct SingleRoute;
@@ -48,19 +48,19 @@ impl Timetable for SingleRoute {
         StopIdx::new(pos)
     }
 
-    fn get_arrival_time(&self, _trip: TripIdx, pos: u32) -> Tau {
-        Tau(pos * 10)
+    fn get_arrival_time(&self, _trip: TripIdx, pos: u32) -> SecondOfDay {
+        SecondOfDay(pos * 10)
     }
 
-    fn get_departure_time(&self, _trip: TripIdx, pos: u32) -> Tau {
-        Tau(pos * 10 + 5)
+    fn get_departure_time(&self, _trip: TripIdx, pos: u32) -> SecondOfDay {
+        SecondOfDay(pos * 10 + 5)
     }
 
     fn get_footpaths_from(&self, _stop: StopIdx) -> &[StopIdx] {
         &[]
     }
 
-    fn get_earliest_trip(&self, _route: RouteIdx, at: Tau, pos: u32) -> Option<TripIdx> {
+    fn get_earliest_trip(&self, _route: RouteIdx, at: SecondOfDay, pos: u32) -> Option<TripIdx> {
         (at < self.get_departure_time(TripIdx::new(0), pos)).then_some(TripIdx::new(0))
     }
 }
@@ -77,7 +77,7 @@ fn main() {
         .from(&[(StopIdx::new(0), raptor::Duration::ZERO)])
         .to(&[(StopIdx::new(9), raptor::Duration::ZERO)])
         .max_transfers(10u8)
-        .depart_at(Tau(0))
+        .depart_at(SecondOfDay(0))
         .run();
 
     println!("{journey:#?}");

@@ -26,7 +26,7 @@ use jiff::civil::Date;
 use rstar::{AABB, PointDistance, RTree, RTreeObject};
 use smallvec::SmallVec;
 
-use crate::{Duration, RouteIdx, StopIdx, Tau, Timetable, TripIdx};
+use crate::{Duration, RouteIdx, SecondOfDay, StopIdx, Timetable, TripIdx};
 
 /// Mean Earth radius in metres, used to project stop coordinates to a
 /// local Cartesian frame for the `with_walking_footpaths` spatial query.
@@ -149,10 +149,10 @@ pub struct GtfsTimetable<'gtfs> {
     routes_for_stop: Vec<SmallVec<[(RouteIdx, u32); TYPICAL_ROUTES_PER_STOP]>>,
     stops_for_route: Vec<Vec<StopIdx>>,
     trips_for_route: Vec<Vec<TripIdx>>,
-    /// arrival_times[route.idx()][stop_pos][trip_pos] = Tau
-    arrival_times: Vec<Vec<Vec<Tau>>>,
-    /// departure_times[route.idx()][stop_pos][trip_pos] = Tau
-    departure_times: Vec<Vec<Vec<Tau>>>,
+    /// arrival_times[route.idx()][stop_pos][trip_pos] = SecondOfDay
+    arrival_times: Vec<Vec<Vec<SecondOfDay>>>,
+    /// departure_times[route.idx()][stop_pos][trip_pos] = SecondOfDay
+    departure_times: Vec<Vec<Vec<SecondOfDay>>>,
     /// route_for_trip[trip.idx()] = (route_idx, position-within-route)
     route_for_trip: Vec<(RouteIdx, usize)>,
 
@@ -245,8 +245,8 @@ impl<'gtfs> GtfsTimetable<'gtfs> {
         let mut route_ids: Vec<&'gtfs str> = Vec::new();
         let mut stops_for_route: Vec<Vec<StopIdx>> = Vec::new();
         let mut trips_for_route: Vec<Vec<TripIdx>> = Vec::new();
-        let mut arrival_times: Vec<Vec<Vec<Tau>>> = Vec::new();
-        let mut departure_times: Vec<Vec<Vec<Tau>>> = Vec::new();
+        let mut arrival_times: Vec<Vec<Vec<SecondOfDay>>> = Vec::new();
+        let mut departure_times: Vec<Vec<Vec<SecondOfDay>>> = Vec::new();
         let mut route_for_trip: Vec<(RouteIdx, usize)> = Vec::with_capacity(gtfs.trips.len());
         let mut trip_ids: Vec<&'gtfs str> = Vec::new();
         let mut trip_by_id: HashMap<&'gtfs str, TripIdx> = HashMap::new();
@@ -286,18 +286,18 @@ impl<'gtfs> GtfsTimetable<'gtfs> {
                 // Per-route arrival/departure tables: shape [stop_pos][trip_pos].
                 let n_stops_in_route = stop_seq.len();
                 let n_trips_in_route = sub_group.len();
-                let mut arr_table: Vec<Vec<Tau>> =
-                    vec![vec![Tau::MAX; n_trips_in_route]; n_stops_in_route];
-                let mut dep_table: Vec<Vec<Tau>> =
-                    vec![vec![Tau::MAX; n_trips_in_route]; n_stops_in_route];
+                let mut arr_table: Vec<Vec<SecondOfDay>> =
+                    vec![vec![SecondOfDay::MAX; n_trips_in_route]; n_stops_in_route];
+                let mut dep_table: Vec<Vec<SecondOfDay>> =
+                    vec![vec![SecondOfDay::MAX; n_trips_in_route]; n_stops_in_route];
                 for (trip_pos, trip_id) in sub_group.iter().enumerate() {
                     let trip = gtfs.get_trip(trip_id).expect("validated above");
                     for (stop_pos, st) in trip.stop_times.iter().enumerate() {
                         if let Some(a) = st.arrival_time {
-                            arr_table[stop_pos][trip_pos] = Tau(a);
+                            arr_table[stop_pos][trip_pos] = SecondOfDay(a);
                         }
                         let d = st.departure_time.expect("validated at construction");
-                        dep_table[stop_pos][trip_pos] = Tau(d);
+                        dep_table[stop_pos][trip_pos] = SecondOfDay(d);
                     }
                 }
                 arrival_times.push(arr_table);
@@ -612,19 +612,19 @@ impl<'gtfs> Timetable for GtfsTimetable<'gtfs> {
         self.stops_for_route[route.idx()][pos as usize]
     }
 
-    fn get_earliest_trip(&self, route: RouteIdx, at: Tau, pos: u32) -> Option<TripIdx> {
+    fn get_earliest_trip(&self, route: RouteIdx, at: SecondOfDay, pos: u32) -> Option<TripIdx> {
         let trips = &self.trips_for_route[route.idx()];
         let dep_row = &self.departure_times[route.idx()][pos as usize];
         let idx = dep_row.partition_point(|&dep| dep < at);
         trips.get(idx).copied()
     }
 
-    fn get_arrival_time(&self, trip: TripIdx, pos: u32) -> Tau {
+    fn get_arrival_time(&self, trip: TripIdx, pos: u32) -> SecondOfDay {
         let (route_idx, trip_pos) = self.route_for_trip[trip.idx()];
         self.arrival_times[route_idx.idx()][pos as usize][trip_pos]
     }
 
-    fn get_departure_time(&self, trip: TripIdx, pos: u32) -> Tau {
+    fn get_departure_time(&self, trip: TripIdx, pos: u32) -> SecondOfDay {
         let (route_idx, trip_pos) = self.route_for_trip[trip.idx()];
         self.departure_times[route_idx.idx()][pos as usize][trip_pos]
     }

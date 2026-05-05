@@ -1,5 +1,5 @@
 use raptor::Duration;
-use raptor::{RouteIdx, StopIdx, Tau, Timetable, TripIdx};
+use raptor::{RouteIdx, SecondOfDay, StopIdx, Timetable, TripIdx};
 
 const R0_STOPS: [StopIdx; 10] = [
     StopIdx::new(0),
@@ -82,22 +82,22 @@ impl Timetable for TwoRoutes {
         }
     }
 
-    fn get_earliest_trip(&self, route: RouteIdx, at: Tau, pos: u32) -> Option<TripIdx> {
+    fn get_earliest_trip(&self, route: RouteIdx, at: SecondOfDay, pos: u32) -> Option<TripIdx> {
         let trip = TripIdx::new(route.get());
         (at < self.get_departure_time(trip, pos)).then_some(trip)
     }
 
-    fn get_arrival_time(&self, trip: TripIdx, pos: u32) -> Tau {
+    fn get_arrival_time(&self, trip: TripIdx, pos: u32) -> SecondOfDay {
         if trip.get() == 0 {
             // R0 trip: arrival at pos n is the stop_id (also n) * 10
-            Tau(R0_STOPS[pos as usize].get() * 10)
+            SecondOfDay(R0_STOPS[pos as usize].get() * 10)
         } else {
             // R1 trip: arrival at position p is (p + 2) * 10
-            Tau((pos + 2) * 10)
+            SecondOfDay((pos + 2) * 10)
         }
     }
 
-    fn get_departure_time(&self, trip: TripIdx, pos: u32) -> Tau {
+    fn get_departure_time(&self, trip: TripIdx, pos: u32) -> SecondOfDay {
         self.get_arrival_time(trip, pos) + Duration(5)
     }
 
@@ -129,7 +129,7 @@ fn main() {
         .from(&[(StopIdx::new(1), Duration::ZERO)])
         .to(&[(StopIdx::new(9), Duration::ZERO)])
         .max_transfers(10u8)
-        .depart_at(Tau(0))
+        .depart_at(SecondOfDay(0))
         .run();
 
     println!("{journey:#?}");

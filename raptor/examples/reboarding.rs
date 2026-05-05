@@ -2,7 +2,7 @@
 //! a shared route at a later stop reached via a faster feeder route.
 
 use raptor::Duration;
-use raptor::{RouteIdx, StopIdx, Tau, Timetable, TripIdx};
+use raptor::{RouteIdx, SecondOfDay, StopIdx, Timetable, TripIdx};
 
 // Stop indices: S=0, A=1, B=2, C=3, D=4
 // Route indices: R1=0 (S->A), R2=1 (S->B), R3=2 (A->B->C->D)
@@ -64,12 +64,12 @@ impl Timetable for ReBoardingTimetable {
         stops[pos as usize]
     }
 
-    fn get_earliest_trip(&self, route: RouteIdx, at: Tau, pos: u32) -> Option<TripIdx> {
+    fn get_earliest_trip(&self, route: RouteIdx, at: SecondOfDay, pos: u32) -> Option<TripIdx> {
         match route.get() {
             0 => {
                 // R1: dep at pos 0 (S) = 0; pos 1 (A) is alight, irrelevant
                 let dep = match pos {
-                    0 => Tau(0),
+                    0 => SecondOfDay(0),
                     _ => return None,
                 };
                 (at <= dep).then_some(R1_T1)
@@ -77,7 +77,7 @@ impl Timetable for ReBoardingTimetable {
             1 => {
                 // R2: dep at pos 0 (S) = 0
                 let dep = match pos {
-                    0 => Tau(0),
+                    0 => SecondOfDay(0),
                     _ => return None,
                 };
                 (at <= dep).then_some(R2_T1)
@@ -85,10 +85,10 @@ impl Timetable for ReBoardingTimetable {
             2 => {
                 // R3: pos 0=A dep 25/105, pos 1=B dep 30/110, pos 2=C dep 40/120
                 let (early_dep, late_dep) = match pos {
-                    0 => (Tau(25), Tau(105)),
-                    1 => (Tau(30), Tau(110)),
-                    2 => (Tau(40), Tau(120)),
-                    3 => (Tau(50), Tau(130)),
+                    0 => (SecondOfDay(25), SecondOfDay(105)),
+                    1 => (SecondOfDay(30), SecondOfDay(110)),
+                    2 => (SecondOfDay(40), SecondOfDay(120)),
+                    3 => (SecondOfDay(50), SecondOfDay(130)),
                     _ => return None,
                 };
                 if at <= early_dep {
@@ -103,31 +103,31 @@ impl Timetable for ReBoardingTimetable {
         }
     }
 
-    fn get_arrival_time(&self, trip: TripIdx, pos: u32) -> Tau {
+    fn get_arrival_time(&self, trip: TripIdx, pos: u32) -> SecondOfDay {
         match (trip.get(), pos) {
-            (0, 1) => Tau(100), // R1_T1 at A
-            (1, 1) => Tau(30),  // R2_T1 at B
-            (3, 1) => Tau(110),
-            (3, 2) => Tau(120),
-            (3, 3) => Tau(130), // R3_LATE
-            (2, 1) => Tau(30),
-            (2, 2) => Tau(40),
-            (2, 3) => Tau(50), // R3_EARLY
-            _ => Tau::MAX,
+            (0, 1) => SecondOfDay(100), // R1_T1 at A
+            (1, 1) => SecondOfDay(30),  // R2_T1 at B
+            (3, 1) => SecondOfDay(110),
+            (3, 2) => SecondOfDay(120),
+            (3, 3) => SecondOfDay(130), // R3_LATE
+            (2, 1) => SecondOfDay(30),
+            (2, 2) => SecondOfDay(40),
+            (2, 3) => SecondOfDay(50), // R3_EARLY
+            _ => SecondOfDay::MAX,
         }
     }
 
-    fn get_departure_time(&self, trip: TripIdx, pos: u32) -> Tau {
+    fn get_departure_time(&self, trip: TripIdx, pos: u32) -> SecondOfDay {
         match (trip.get(), pos) {
-            (0, 0) => Tau(0), // R1_T1 at S
-            (1, 0) => Tau(0), // R2_T1 at S
-            (3, 0) => Tau(105),
-            (3, 1) => Tau(110),
-            (3, 2) => Tau(120), // R3_LATE
-            (2, 0) => Tau(25),
-            (2, 1) => Tau(30),
-            (2, 2) => Tau(40), // R3_EARLY
-            _ => Tau::MAX,
+            (0, 0) => SecondOfDay(0), // R1_T1 at S
+            (1, 0) => SecondOfDay(0), // R2_T1 at S
+            (3, 0) => SecondOfDay(105),
+            (3, 1) => SecondOfDay(110),
+            (3, 2) => SecondOfDay(120), // R3_LATE
+            (2, 0) => SecondOfDay(25),
+            (2, 1) => SecondOfDay(30),
+            (2, 2) => SecondOfDay(40), // R3_EARLY
+            _ => SecondOfDay::MAX,
         }
     }
 
@@ -151,7 +151,7 @@ fn main() {
         .from(&[(S, Duration::ZERO)])
         .to(&[(D, Duration::ZERO)])
         .max_transfers(3u8)
-        .depart_at(Tau(0))
+        .depart_at(SecondOfDay(0))
         .run();
 
     println!("{journeys:#?}");

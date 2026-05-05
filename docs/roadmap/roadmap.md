@@ -30,9 +30,9 @@ output against a brute-force solver before declaring victory.
 ### 0.1 Carry forward round labels (τₖ(p) ← τₖ₋₁(p))
 
 **Status:** landed on v0.3 branch. Labels now live in
-`Vec<BTreeMap<Stop, Tau>>` indexed by round; each round k starts with
+`Vec<BTreeMap<Stop, SecondOfDay>>` indexed by round; each round k starts with
 `labels[k] = labels[k - 1].clone()`. Once stops are interned to `u32`
-indices (Phase 1), this can become `Vec<Vec<Tau>>` for branch-free
+indices (Phase 1), this can become `Vec<Vec<SecondOfDay>>` for branch-free
 carry-forward — that's a Phase 1 follow-up, not a soundness change.
 
 ### 0.2 Footpath relaxation from the source in round 1
@@ -118,13 +118,13 @@ chains direct walks `A → B → C` to a fixed point per round.
 callers who want coordinate-derived walking edges can chain the new
 `with_walking_footpaths` builder (see roadmap item 3.4).
 
-### 0.8 Saturating arithmetic on Tau
+### 0.8 Saturating arithmetic on SecondOfDay
 
 **Status:** landed on v0.3 branch. `relax_footpaths_round` is the only
-site in the algorithm that combines `Tau` values arithmetically and it
+site in the algorithm that combines `SecondOfDay` values arithmetically and it
 uses `saturating_add`. A sweep of `Timetable::raptor`, the simple
-adapter, and the GTFS adapter confirmed there is no other `Tau`
-arithmetic — route scanning compares Tau values returned by the
+adapter, and the GTFS adapter confirmed there is no other `SecondOfDay`
+arithmetic — route scanning compares SecondOfDay values returned by the
 underlying timetable but never combines them.
 
 ### 0.9 Property-based correctness test
@@ -164,7 +164,7 @@ original handoff brief and are documented in the module's README:
 ## Phase 1 — Make it fast (performance)
 
 Once correctness is locked down, the big perf wins are about data
-representation. The current `BTreeMap<(K, Stop), Tau>` design is
+representation. The current `BTreeMap<(K, Stop), SecondOfDay>` design is
 ~10–100× off optimal on realistic networks.
 
 ### 1.1 Intern stops, routes, trips to dense `u32` indices
@@ -189,13 +189,13 @@ sub-trait `IndexedTimetable: Timetable<Stop = u32, Route = u32, Trip = u32>`
 that the algorithm specialises on. The generic version stays for tests
 and for users with weird custom backends.
 
-### 1.2 `Vec<Vec<Tau>>` labels instead of `BTreeMap<(K, Stop), Tau>`
+### 1.2 `Vec<Vec<SecondOfDay>>` labels instead of `BTreeMap<(K, Stop), SecondOfDay>`
 
 Once stops are dense indices, labels become:
 
 ```rust
 // labels[k][stop_idx] = earliest arrival at stop_idx with at most k transfers
-let mut labels: Vec<Vec<Tau>> = vec![vec![Tau::MAX; n_stops]; transfers + 1];
+let mut labels: Vec<Vec<SecondOfDay>> = vec![vec![SecondOfDay::MAX; n_stops]; transfers + 1];
 labels[0][ps_idx] = tau;
 ```
 
@@ -223,7 +223,7 @@ representation choice behind a config option if needed.
 
 After the route-pattern splitting from 0.6, this is even cleaner: each
 synthetic route has a fixed stop sequence, so we can flatten to
-`departures[route_idx][stop_pos][trip_pos] -> Tau`.
+`departures[route_idx][stop_pos][trip_pos] -> SecondOfDay`.
 
 ### 1.4 Marked-stops as a bitset
 
@@ -303,13 +303,13 @@ fully multi-criterion-correct pruning is queued for v0.14+.
 pub trait Label: Copy + Ord + Debug {
     /// The "departure-time" component of the label; this is what gets
     /// initialized at the source.
-    fn from_departure(tau: Tau) -> Self;
+    fn from_departure(tau: SecondOfDay) -> Self;
 
     /// Combine a label with the cost of riding a trip to a new stop.
-    fn extend_by_trip(self, arrival_at_new_stop: Tau) -> Self;
+    fn extend_by_trip(self, arrival_at_new_stop: SecondOfDay) -> Self;
 
     /// Combine a label with the cost of walking a footpath.
-    fn extend_by_footpath(self, transfer_time: Tau) -> Self;
+    fn extend_by_footpath(self, transfer_time: SecondOfDay) -> Self;
 
     /// Returns true if `self` weakly dominates `other`: every component
     /// of self is ≤ the corresponding component of other.
@@ -321,12 +321,12 @@ Single-criterion RAPTOR is then:
 
 ```rust
 #[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Debug)]
-pub struct ArrivalTime(pub Tau);
+pub struct ArrivalTime(pub SecondOfDay);
 
 impl Label for ArrivalTime {
-    fn from_departure(tau: Tau) -> Self { ArrivalTime(tau) }
-    fn extend_by_trip(self, arrival: Tau) -> Self { ArrivalTime(arrival) }
-    fn extend_by_footpath(self, dt: Tau) -> Self {
+    fn from_departure(tau: SecondOfDay) -> Self { ArrivalTime(tau) }
+    fn extend_by_trip(self, arrival: SecondOfDay) -> Self { ArrivalTime(arrival) }
+    fn extend_by_footpath(self, dt: SecondOfDay) -> Self {
         ArrivalTime(self.0.saturating_add(dt))
     }
     fn dominates(&self, other: &Self) -> bool { self.0 <= other.0 }
@@ -515,7 +515,7 @@ queries. Start with the former.
 **Date type:** introduce `jiff::civil::Date` as the public surface for
 the service date (and any future date arithmetic). `gtfs-structures`
 exposes its calendar as `chrono::NaiveDate`, so convert at the
-boundary. We don't currently use any date type directly — `Tau =
+boundary. We don't currently use any date type directly — `SecondOfDay =
 usize` (seconds since midnight) is the only time representation — so
 this is an additive change, not a migration.
 

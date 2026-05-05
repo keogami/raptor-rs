@@ -4,16 +4,16 @@
 
 API ergonomics pass. The query surface collapses from six methods to one
 typestate builder; primitive `usize` timestamps and walk-time offsets become
-typed `Tau` / `Duration` / `Transfers` newtypes; the `simple` adapter
+typed `SecondOfDay` / `Duration` / `Transfers` newtypes; the `simple` adapter
 renames to `manual`. Mass breakage with no compatibility shim — pre-release,
 the cleaner shape wins.
 
 ### New types
 
-- `pub struct Tau(pub u32)` — was `pub type Tau = usize`. A timestamp,
+- `pub struct SecondOfDay(pub u32)` — was `pub type SecondOfDay = usize`. A timestamp,
   seconds since midnight. `ZERO`, `MAX`, `from_secs`, `hms`, `as_secs`,
   `as_hms`, `From<u32>`, `Display`, plus the arithmetic impls below.
-- `pub struct Duration(pub u32)` — a length of time, distinct from `Tau`.
+- `pub struct Duration(pub u32)` — a length of time, distinct from `SecondOfDay`.
   Walk-time offsets, transfer times, dwell times all use `Duration`.
 - `pub struct Transfers(pub u8)` — user-facing transfer cap (255 is plenty;
   RAPTOR's interest is in low-transfer journeys).
@@ -26,9 +26,9 @@ the cleaner shape wins.
 
 ### Arithmetic
 
-- `Tau + Duration → Tau` (saturating).
-- `Tau - Tau → Duration` (saturating to `Duration::ZERO`).
-- `Tau - Duration → Tau` (saturating to `Tau::ZERO`).
+- `SecondOfDay + Duration → SecondOfDay` (saturating).
+- `SecondOfDay - SecondOfDay → Duration` (saturating to `Duration::ZERO`).
+- `SecondOfDay - Duration → SecondOfDay` (saturating to `SecondOfDay::ZERO`).
 - `Duration + Duration → Duration` (saturating).
 
 ### Trait surface
@@ -53,7 +53,7 @@ let journeys = tt
     .from(start)              // bare StopIdx, slice, or Vec
     .to(end)
     .max_transfers(10u8)      // u8, defaults to Transfers(10)
-    .depart_at(Tau::hms(9, 0, 0))
+    .depart_at(SecondOfDay::hms(9, 0, 0))
     .run();
 
 // Range query — same shape, swap the departure method:
@@ -61,13 +61,13 @@ let profile = tt
     .query()
     .from(start).to(end)
     .max_transfers(10u8)
-    .depart_in_window((17 * 3600..18 * 3600).step_by(60).map(Tau::from_secs))
+    .depart_in_window((17 * 3600..18 * 3600).step_by(60).map(SecondOfDay::from_secs))
     .run();
 
 // Reuse a cache:
 let mut cache = RaptorCache::for_timetable(&tt);
 let journeys = tt.query().from(start).to(end)
-    .depart_at(Tau::hms(9, 0, 0))
+    .depart_at(SecondOfDay::hms(9, 0, 0))
     .run_with_cache(&mut cache);
 ```
 
@@ -110,8 +110,8 @@ tt.query_with_label::<MyLabel>().from(&origins).to(&targets)
     .max_transfers(K as u8).depart_at(T).run()
 ```
 
-`Tau` literals must be wrapped — `0` becomes `Tau(0)`, `Tau::ZERO`,
-or `Tau::from_secs(0)`. `Duration` walk-time offsets become
+`SecondOfDay` literals must be wrapped — `0` becomes `SecondOfDay(0)`, `SecondOfDay::ZERO`,
+or `SecondOfDay::from_secs(0)`. `Duration` walk-time offsets become
 `Duration::ZERO` or `Duration(N)`. The cross-city benchmark example,
 the test suite, the proptest harness, and the dotgraph adapter were
 all migrated automatically by a paren-aware Python script with a
@@ -139,7 +139,7 @@ today won't have to migrate.
 ### Added
 
 - `Timetable::raptor_range(transfers, departures, origins, targets)
-  -> Vec<RangeJourney>` — for each `Tau` in `departures` (any
+  -> Vec<RangeJourney>` — for each `SecondOfDay` in `departures` (any
   `IntoIterator`), runs the algorithm and Pareto-filters the
   combined results into a profile. Common pattern:
   `tt.raptor_range(10, (t_start..t_end).step_by(60), &origins,
@@ -291,10 +291,10 @@ journeys, real but bounded perf hit.
   dominated by an existing entry join the bag.
 - Footpath relax (both Dijkstra and single-pass) extends every label
   in the source bag along each footpath edge.
-- Boarding tree key is now `(K, StopIdx, Tau)` — the third component
+- Boarding tree key is now `(K, StopIdx, SecondOfDay)` — the third component
   is the label's effective arrival, disambiguating Pareto-optimal
   labels with distinct arrival times in the same bag. `Step` variants
-  carry a `parent_arrival: Tau` field so reconstruction can pick the
+  carry a `parent_arrival: SecondOfDay` field so reconstruction can pick the
   right parent label out of the parent bag.
 - Reconstruction enumerates per-label per-round at every target,
   deduplicating by `(target, raw_arrival, k, walk)`. Multi-criterion
@@ -312,7 +312,7 @@ journeys, real but bounded perf hit.
   touched this query, recovering ~30% of the regression.
 - The remaining gap is from bag operations themselves — for ArrivalTime
   size-1 bags the route scan does 2-3 trait method calls per stop
-  visit (insert, dominates, snapshot) where v0.10 used direct `Tau`
+  visit (insert, dominates, snapshot) where v0.10 used direct `SecondOfDay`
   comparisons. A future v0.12 specialisation can reclaim more for
   pure single-criterion users; for now correctness on multi-criterion
   is the priority and the bench numbers stay well under interactive
@@ -348,7 +348,7 @@ stop) is planned for v0.11.
   and methods `from_departure`, `extend_by_trip`,
   `extend_by_footpath`, `dominates`, `arrival`. The default
   `dominates` impl uses `arrival` (correct for single-criterion).
-- `pub struct ArrivalTime(pub Tau)` — the only `Label` impl shipped.
+- `pub struct ArrivalTime(pub SecondOfDay)` — the only `Label` impl shipped.
   Default for both `Journey<L>` and `RaptorCache<L>`.
 - `Timetable::raptor_with_label::<L>` and
   `Timetable::raptor_with_cache_and_label::<L>` — generic variants
@@ -358,10 +358,10 @@ stop) is planned for v0.11.
 
 ### Breaking changes
 
-- `Journey` lost its `pub arrival: Tau` field; replaced by `pub label:
-  L` plus a convenience `Journey::arrival(&self) -> Tau` method.
+- `Journey` lost its `pub arrival: SecondOfDay` field; replaced by `pub label:
+  L` plus a convenience `Journey::arrival(&self) -> SecondOfDay` method.
   Callers reading `j.arrival` need to use `j.arrival()` instead. For
-  the default `ArrivalTime` label, `j.label.0` is also the bare `Tau`.
+  the default `ArrivalTime` label, `j.label.0` is also the bare `SecondOfDay`.
 - `Journey` and `RaptorCache` are now generic over `L: Label` with
   default `ArrivalTime`. Type inference covers most call sites
   unchanged; explicit annotations like `let j: Vec<Journey> = …`
@@ -370,7 +370,7 @@ stop) is planned for v0.11.
 ### Performance
 
 - Generic refactor adds no measurable overhead — `ArrivalTime`'s
-  trait methods inline to direct `Tau` operations. Cross-city bench
+  trait methods inline to direct `SecondOfDay` operations. Cross-city bench
   numbers are unchanged from v0.9 within measurement noise.
 
 ### Tests
@@ -457,7 +457,7 @@ longer a soundness prerequisite.
   Replaces an earlier single-pass relaxation that required the input to
   be closed; a Bellman-Ford-style intermediate form turned out to
   degenerate to `O(V·E)` on dense walking graphs.
-- `RaptorCache` gains a `relax_heap` field (`BinaryHeap<Reverse<(Tau,
+- `RaptorCache` gains a `relax_heap` field (`BinaryHeap<Reverse<(SecondOfDay,
   u32)>>`) reused across rounds. Construction API is unchanged
   (`RaptorCache::for_timetable` / `with_capacity`).
 
@@ -502,7 +502,7 @@ longer a soundness prerequisite.
 ## [0.7.0] — 2026-05-05
 
 Multi-source / multi-target queries. The `Timetable::raptor` and
-`raptor_with_cache` signatures now take `&[(StopIdx, Tau)]` slices for
+`raptor_with_cache` signatures now take `&[(StopIdx, SecondOfDay)]` slices for
 both origins and targets — each tuple is a `(stop, walk_time_offset)`
 pair. The user supplies the candidate stops near their actual origin
 (and destination) along with how long it takes to walk to each;
@@ -521,7 +521,7 @@ platforms as origins/targets and have the algorithm pick correctly.
 
 - `Timetable::raptor` and `raptor_with_cache` change from
   `(transfers, tau, ps: StopIdx, pt: StopIdx)` to
-  `(transfers, tau, origins: &[(StopIdx, Tau)], targets: &[(StopIdx, Tau)])`.
+  `(transfers, tau, origins: &[(StopIdx, SecondOfDay)], targets: &[(StopIdx, SecondOfDay)])`.
   Single-stop queries become `&[(stop, 0)]`.
 - `Journey` gains two fields: `origin: StopIdx` (which of the supplied
   origins this journey actually started from) and `target: StopIdx`
@@ -530,7 +530,7 @@ platforms as origins/targets and have the algorithm pick correctly.
 
 ### Added
 
-- `GtfsTimetable::station_stops(parent_id) -> &[(StopIdx, Tau)]`:
+- `GtfsTimetable::station_stops(parent_id) -> &[(StopIdx, SecondOfDay)]`:
   returns the child platforms of a parent station, ready to pass
   directly to `raptor` as origins or targets. Each entry has walk
   time 0 by default; callers wanting platform-specific walk times
@@ -614,8 +614,8 @@ ambiguity that was the root cause.
     that route).
   - `get_stops_after(route, pos: u32) -> &[StopIdx]` (was
     `(route, stop)`).
-  - `get_arrival_time(trip, pos: u32) -> Tau` (was `(trip, stop)`).
-  - `get_departure_time(trip, pos: u32) -> Tau` (was `(trip, stop)`).
+  - `get_arrival_time(trip, pos: u32) -> SecondOfDay` (was `(trip, stop)`).
+  - `get_departure_time(trip, pos: u32) -> SecondOfDay` (was `(trip, stop)`).
   - `get_earliest_trip(route, at, pos: u32) -> Option<TripIdx>` (was
     `(route, at, stop)`).
 - New trait method: `stop_at(route, pos: u32) -> StopIdx` — looks up
@@ -670,7 +670,7 @@ adapter pre-computes per-route departure/arrival tables, and the
   `n_routes()` methods; slice-returning accessors return `&[T]` instead
   of `Cow<[T]>`.
 - `Journey` is now non-generic:
-  `Journey { plan: Vec<(RouteIdx, StopIdx)>, arrival: Tau }`.
+  `Journey { plan: Vec<(RouteIdx, StopIdx)>, arrival: SecondOfDay }`.
 - `RaptorCache` is non-generic and constructed via
   `RaptorCache::for_timetable` (or `RaptorCache::with_capacity` for the
   count-only path). Reusing a cache against a differently-sized timetable
@@ -695,8 +695,8 @@ adapter pre-computes per-route departure/arrival tables, and the
 
 ### Performance
 
-- Round labels are now `Vec<Vec<Tau>>` indexed by `(round, stop_idx)`
-  rather than `Vec<BTreeMap<Stop, Tau>>` — all label reads/writes in the
+- Round labels are now `Vec<Vec<SecondOfDay>>` indexed by `(round, stop_idx)`
+  rather than `Vec<BTreeMap<Stop, SecondOfDay>>` — all label reads/writes in the
   hot loop are array indexing.
 - Marked stops are a `fixedbitset::FixedBitSet` sized to `n_stops`;
   insertion is a single bit write, iteration walks set bits.
@@ -749,7 +749,7 @@ The full Phase 0 list. Each was a soundness gap on `v0.2.0`; details
 are in `soundness.md` (issues A–I, all moved to Resolved Issues).
 
 - **Carry-forward round labels** (issue A): labels are now stored as
-  `Vec<BTreeMap<Stop, Tau>>` indexed by round, with `labels[k] =
+  `Vec<BTreeMap<Stop, SecondOfDay>>` indexed by round, with `labels[k] =
   labels[k-1].clone()` at the top of each round. Stops reached in
   earlier rounds remain usable as boarding points and footpath
   origins.
@@ -774,7 +774,7 @@ are in `soundness.md` (issues A–I, all moved to Resolved Issues).
   through walks within a round so walk-then-board, board-walk-board,
   and board-then-walk-to-pt journeys all reach the user.
 - **Saturating arithmetic** (issue G): `relax_footpaths_round` uses
-  `saturating_add`; the rest of the algorithm performs no `Tau`
+  `saturating_add`; the rest of the algorithm performs no `SecondOfDay`
   arithmetic.
 - **Documented invariants** (issue H): the `Timetable` trait spells
   out the footpath-transitivity and no-overtaking contracts.

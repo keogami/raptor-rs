@@ -113,11 +113,11 @@ A–I were resolved on the v0.3 development branch.
 
 ### A: Round labels are not carried forward — **Fixed (v0.3)**
 
-**Was**: labels lived in `BTreeMap<(K, Stop), Tau>` and entries were
+**Was**: labels lived in `BTreeMap<(K, Stop), SecondOfDay>` and entries were
 only inserted on improvement, so footpath relaxation in round k could
 not see arrivals from round k−1 that had not been re-improved.
 
-**Now**: labels are stored in `Vec<BTreeMap<Stop, Tau>>` indexed by
+**Now**: labels are stored in `Vec<BTreeMap<Stop, SecondOfDay>>` indexed by
 round. At the top of each round, `labels[k] = labels[k-1].clone()`
 seeds round k with the previous round's values. Footpath origins
 reached in earlier rounds remain visible.
@@ -214,14 +214,14 @@ journey ending in a walk is emitted with its last *boarded* alight stop
 in the plan and the walk-derived arrival time. Surfacing walk steps in
 the public API is a future enhancement.
 
-### G: Saturating arithmetic on `Tau` everywhere — **Fixed (v0.3)**
+### G: Saturating arithmetic on `SecondOfDay` everywhere — **Fixed (v0.3)**
 
 **Was**: the v0.2.0 footpath stage added `transfer_time` without
 `saturating_add`, allowing wrap on misconfigured input.
 
 **Now**: `relax_footpaths_round` is the only site in the algorithm
-that combines `Tau` values arithmetically, and it uses `saturating_add`.
-A 0.8 audit confirmed there is no other `Tau` arithmetic in
+that combines `SecondOfDay` values arithmetically, and it uses `saturating_add`.
+A 0.8 audit confirmed there is no other `SecondOfDay` arithmetic in
 `Timetable::raptor`, in the simple adapter, or in the GTFS adapter
 (beyond reading values out of the underlying timetable, which the
 algorithm only compares, never combines).
@@ -251,7 +251,7 @@ correctly identify catchable trips.
 fn get_earliest_trip(
     &self,
     route: Self::Route,
-    at: Tau,
+    at: SecondOfDay,
     stop: Self::Stop,
 ) -> Option<Self::Trip>;
 ```

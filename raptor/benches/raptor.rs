@@ -1,7 +1,7 @@
 use criterion::{BenchmarkId, Criterion, criterion_group, criterion_main};
 use raptor::Timetable;
 use raptor::manual::builders::*;
-use raptor::{Duration, Tau};
+use raptor::{Duration, SecondOfDay};
 
 /// Routes from the first stop to the last on a single route. Tests how performance
 /// scales as the number of stops and trips on one route grows. (explained by llm)
@@ -20,7 +20,7 @@ fn bench_linear(c: &mut Criterion) {
                         .from(&[(source, Duration::ZERO)])
                         .to(&[(target, Duration::ZERO)])
                         .max_transfers(3u8)
-                        .depart_at(Tau(0))
+                        .depart_at(SecondOfDay(0))
                         .run()
                 })
             },
@@ -52,7 +52,7 @@ fn bench_grid(c: &mut Criterion) {
                         .from(&[(source, Duration::ZERO)])
                         .to(&[(target, Duration::ZERO)])
                         .max_transfers(5u8)
-                        .depart_at(Tau(0))
+                        .depart_at(SecondOfDay(0))
                         .run()
                 })
             },
@@ -86,7 +86,7 @@ fn bench_hub_spoke(c: &mut Criterion) {
                         .from(&[(source, Duration::ZERO)])
                         .to(&[(target, Duration::ZERO)])
                         .max_transfers(5u8)
-                        .depart_at(Tau(0))
+                        .depart_at(SecondOfDay(0))
                         .run()
                 })
             },
@@ -109,7 +109,7 @@ fn bench_transfer_scaling(c: &mut Criterion) {
                     .from(&[(source, Duration::ZERO)])
                     .to(&[(target, Duration::ZERO)])
                     .max_transfers(k as u8)
-                    .depart_at(Tau(0))
+                    .depart_at(SecondOfDay(0))
                     .run()
             })
         });
@@ -135,7 +135,7 @@ fn bench_reconstruction_depth(c: &mut Criterion) {
                         .from(&[(source, Duration::ZERO)])
                         .to(&[(target, Duration::ZERO)])
                         .max_transfers((segments + 1) as u8)
-                        .depart_at(Tau(0))
+                        .depart_at(SecondOfDay(0))
                         .run()
                 })
             },
@@ -162,7 +162,7 @@ fn bench_reconstruction_breadth(c: &mut Criterion) {
                         .from(&[(source, Duration::ZERO)])
                         .to(&[(target, Duration::ZERO)])
                         .max_transfers((max_legs + 1) as u8)
-                        .depart_at(Tau(0))
+                        .depart_at(SecondOfDay(0))
                         .run()
                 })
             },

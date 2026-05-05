@@ -1,6 +1,6 @@
 use crate::Duration;
 use crate::RaptorCache;
-use crate::Tau;
+use crate::SecondOfDay;
 use crate::Timetable;
 use crate::manual::SimpleTimetable;
 
@@ -47,12 +47,24 @@ fn reboarding_picks_correct_boarding_stop() {
         .route(
             R1,
             &[S, A],
-            &[(R1T1, &[(Tau(0), Tau(0)), (Tau(100), Tau(100))])],
+            &[(
+                R1T1,
+                &[
+                    (SecondOfDay(0), SecondOfDay(0)),
+                    (SecondOfDay(100), SecondOfDay(100)),
+                ],
+            )],
         )
         .route(
             R2,
             &[S, B],
-            &[(R2T1, &[(Tau(0), Tau(0)), (Tau(30), Tau(30))])],
+            &[(
+                R2T1,
+                &[
+                    (SecondOfDay(0), SecondOfDay(0)),
+                    (SecondOfDay(30), SecondOfDay(30)),
+                ],
+            )],
         )
         .route(
             R3,
@@ -61,19 +73,19 @@ fn reboarding_picks_correct_boarding_stop() {
                 (
                     R3Late,
                     &[
-                        (Tau(105), Tau(105)),
-                        (Tau(110), Tau(110)),
-                        (Tau(120), Tau(120)),
-                        (Tau(130), Tau(130)),
+                        (SecondOfDay(105), SecondOfDay(105)),
+                        (SecondOfDay(110), SecondOfDay(110)),
+                        (SecondOfDay(120), SecondOfDay(120)),
+                        (SecondOfDay(130), SecondOfDay(130)),
                     ],
                 ),
                 (
                     R3Early,
                     &[
-                        (Tau(25), Tau(25)),
-                        (Tau(30), Tau(30)),
-                        (Tau(40), Tau(40)),
-                        (Tau(50), Tau(50)),
+                        (SecondOfDay(25), SecondOfDay(25)),
+                        (SecondOfDay(30), SecondOfDay(30)),
+                        (SecondOfDay(40), SecondOfDay(40)),
+                        (SecondOfDay(50), SecondOfDay(50)),
                     ],
                 ),
             ],
@@ -84,14 +96,14 @@ fn reboarding_picks_correct_boarding_stop() {
         .from(&[(tt.stop_idx_of(&S), Duration::ZERO)])
         .to(&[(tt.stop_idx_of(&D), Duration::ZERO)])
         .max_transfers(3u8)
-        .depart_at(Tau(0))
+        .depart_at(SecondOfDay(0))
         .run();
 
     // The optimal journey: S->B via R2, then B->D via R3/Early, arriving at t=50
     assert!(!journeys.is_empty(), "should find at least one journey");
 
     let best = journeys.iter().min_by_key(|j| j.arrival()).unwrap();
-    assert_eq!(best.arrival(), Tau(50));
+    assert_eq!(best.arrival(), SecondOfDay(50));
     assert_eq!(best.plan, plan!(tt; (R2, B), (R3, D)));
 }
 
@@ -121,12 +133,24 @@ fn no_journey_disconnected_graph() {
         .route(
             Route::R1,
             &[Stop::A, Stop::B],
-            &[(Trip::T1, &[(Tau(0), Tau(0)), (Tau(10), Tau(10))])],
+            &[(
+                Trip::T1,
+                &[
+                    (SecondOfDay(0), SecondOfDay(0)),
+                    (SecondOfDay(10), SecondOfDay(10)),
+                ],
+            )],
         )
         .route(
             Route::R2,
             &[Stop::C, Stop::D],
-            &[(Trip::T2, &[(Tau(0), Tau(0)), (Tau(10), Tau(10))])],
+            &[(
+                Trip::T2,
+                &[
+                    (SecondOfDay(0), SecondOfDay(0)),
+                    (SecondOfDay(10), SecondOfDay(10)),
+                ],
+            )],
         );
 
     let journeys = tt
@@ -134,7 +158,7 @@ fn no_journey_disconnected_graph() {
         .from(&[(tt.stop_idx_of(&Stop::A), Duration::ZERO)])
         .to(&[(tt.stop_idx_of(&Stop::D), Duration::ZERO)])
         .max_transfers(3u8)
-        .depart_at(Tau(0))
+        .depart_at(SecondOfDay(0))
         .run();
     assert!(
         journeys.is_empty(),
@@ -165,12 +189,24 @@ fn no_journey_missed_connection() {
         .route(
             Route::R1,
             &[Stop::A, Stop::B],
-            &[(Trip::T1, &[(Tau(0), Tau(0)), (Tau(50), Tau(50))])],
+            &[(
+                Trip::T1,
+                &[
+                    (SecondOfDay(0), SecondOfDay(0)),
+                    (SecondOfDay(50), SecondOfDay(50)),
+                ],
+            )],
         )
         .route(
             Route::R2,
             &[Stop::B, Stop::C],
-            &[(Trip::T2, &[(Tau(0), Tau(30)), (Tau(40), Tau(40))])],
+            &[(
+                Trip::T2,
+                &[
+                    (SecondOfDay(0), SecondOfDay(30)),
+                    (SecondOfDay(40), SecondOfDay(40)),
+                ],
+            )],
         );
 
     let journeys = tt
@@ -178,7 +214,7 @@ fn no_journey_missed_connection() {
         .from(&[(tt.stop_idx_of(&Stop::A), Duration::ZERO)])
         .to(&[(tt.stop_idx_of(&Stop::C), Duration::ZERO)])
         .max_transfers(3u8)
-        .depart_at(Tau(0))
+        .depart_at(SecondOfDay(0))
         .run();
     assert!(
         journeys.is_empty(),
@@ -205,7 +241,13 @@ fn no_journey_late_departure() {
     let tt = SimpleTimetable::new().route(
         Route::R1,
         &[Stop::A, Stop::B],
-        &[(Trip::T1, &[(Tau(0), Tau(10)), (Tau(20), Tau(20))])],
+        &[(
+            Trip::T1,
+            &[
+                (SecondOfDay(0), SecondOfDay(10)),
+                (SecondOfDay(20), SecondOfDay(20)),
+            ],
+        )],
     );
 
     let journeys = tt
@@ -213,7 +255,7 @@ fn no_journey_late_departure() {
         .from(&[(tt.stop_idx_of(&Stop::A), Duration::ZERO)])
         .to(&[(tt.stop_idx_of(&Stop::B), Duration::ZERO)])
         .max_transfers(3u8)
-        .depart_at(Tau(100))
+        .depart_at(SecondOfDay(100))
         .run();
     assert!(
         journeys.is_empty(),
@@ -240,7 +282,13 @@ fn no_journey_transfers_zero() {
     let tt = SimpleTimetable::new().route(
         Route::R1,
         &[Stop::A, Stop::B],
-        &[(Trip::T1, &[(Tau(0), Tau(0)), (Tau(10), Tau(10))])],
+        &[(
+            Trip::T1,
+            &[
+                (SecondOfDay(0), SecondOfDay(0)),
+                (SecondOfDay(10), SecondOfDay(10)),
+            ],
+        )],
     );
 
     let journeys = tt
@@ -248,7 +296,7 @@ fn no_journey_transfers_zero() {
         .from(&[(tt.stop_idx_of(&Stop::A), Duration::ZERO)])
         .to(&[(tt.stop_idx_of(&Stop::B), Duration::ZERO)])
         .max_transfers(0u8)
-        .depart_at(Tau(0))
+        .depart_at(SecondOfDay(0))
         .run();
     assert!(journeys.is_empty(), "transfers=0 should yield no journeys");
 }
@@ -272,7 +320,13 @@ fn source_equals_target() {
     let tt = SimpleTimetable::new().route(
         Route::R1,
         &[Stop::A, Stop::B],
-        &[(Trip::T1, &[(Tau(0), Tau(0)), (Tau(10), Tau(10))])],
+        &[(
+            Trip::T1,
+            &[
+                (SecondOfDay(0), SecondOfDay(0)),
+                (SecondOfDay(10), SecondOfDay(10)),
+            ],
+        )],
     );
 
     let journeys = tt
@@ -280,7 +334,7 @@ fn source_equals_target() {
         .from(&[(tt.stop_idx_of(&Stop::A), Duration::ZERO)])
         .to(&[(tt.stop_idx_of(&Stop::A), Duration::ZERO)])
         .max_transfers(3u8)
-        .depart_at(Tau(0))
+        .depart_at(SecondOfDay(0))
         .run();
     assert!(
         journeys.is_empty(),
@@ -310,7 +364,11 @@ fn direct_journey_single_route() {
         &[Stop::A, Stop::B, Stop::C],
         &[(
             Trip::T1,
-            &[(Tau(0), Tau(0)), (Tau(10), Tau(10)), (Tau(20), Tau(20))],
+            &[
+                (SecondOfDay(0), SecondOfDay(0)),
+                (SecondOfDay(10), SecondOfDay(10)),
+                (SecondOfDay(20), SecondOfDay(20)),
+            ],
         )],
     );
 
@@ -319,10 +377,10 @@ fn direct_journey_single_route() {
         .from(&[(tt.stop_idx_of(&Stop::A), Duration::ZERO)])
         .to(&[(tt.stop_idx_of(&Stop::C), Duration::ZERO)])
         .max_transfers(3u8)
-        .depart_at(Tau(0))
+        .depart_at(SecondOfDay(0))
         .run();
     assert_eq!(journeys.len(), 1);
-    assert_eq!(journeys[0].arrival(), Tau(20));
+    assert_eq!(journeys[0].arrival(), SecondOfDay(20));
     assert_eq!(journeys[0].plan, plan!(tt; (Route::R1, Stop::C)));
 }
 
@@ -348,12 +406,24 @@ fn direct_journey_picks_fastest_route() {
         .route(
             Route::R1,
             &[Stop::A, Stop::B],
-            &[(Trip::T1, &[(Tau(0), Tau(0)), (Tau(100), Tau(100))])],
+            &[(
+                Trip::T1,
+                &[
+                    (SecondOfDay(0), SecondOfDay(0)),
+                    (SecondOfDay(100), SecondOfDay(100)),
+                ],
+            )],
         )
         .route(
             Route::R2,
             &[Stop::A, Stop::B],
-            &[(Trip::T2, &[(Tau(0), Tau(0)), (Tau(50), Tau(50))])],
+            &[(
+                Trip::T2,
+                &[
+                    (SecondOfDay(0), SecondOfDay(0)),
+                    (SecondOfDay(50), SecondOfDay(50)),
+                ],
+            )],
         );
 
     let journeys = tt
@@ -361,10 +431,10 @@ fn direct_journey_picks_fastest_route() {
         .from(&[(tt.stop_idx_of(&Stop::A), Duration::ZERO)])
         .to(&[(tt.stop_idx_of(&Stop::B), Duration::ZERO)])
         .max_transfers(3u8)
-        .depart_at(Tau(0))
+        .depart_at(SecondOfDay(0))
         .run();
     let best = journeys.iter().min_by_key(|j| j.arrival()).unwrap();
-    assert_eq!(best.arrival(), Tau(50));
+    assert_eq!(best.arrival(), SecondOfDay(50));
 }
 
 #[test]
@@ -390,12 +460,24 @@ fn exact_time_connection() {
         .route(
             Route::R1,
             &[Stop::A, Stop::B],
-            &[(Trip::T1, &[(Tau(0), Tau(0)), (Tau(20), Tau(20))])],
+            &[(
+                Trip::T1,
+                &[
+                    (SecondOfDay(0), SecondOfDay(0)),
+                    (SecondOfDay(20), SecondOfDay(20)),
+                ],
+            )],
         )
         .route(
             Route::R2,
             &[Stop::B, Stop::C],
-            &[(Trip::T2, &[(Tau(0), Tau(20)), (Tau(30), Tau(30))])],
+            &[(
+                Trip::T2,
+                &[
+                    (SecondOfDay(0), SecondOfDay(20)),
+                    (SecondOfDay(30), SecondOfDay(30)),
+                ],
+            )],
         );
 
     let journeys = tt
@@ -403,11 +485,11 @@ fn exact_time_connection() {
         .from(&[(tt.stop_idx_of(&Stop::A), Duration::ZERO)])
         .to(&[(tt.stop_idx_of(&Stop::C), Duration::ZERO)])
         .max_transfers(3u8)
-        .depart_at(Tau(0))
+        .depart_at(SecondOfDay(0))
         .run();
     assert!(!journeys.is_empty(), "exact-time connection should work");
     let best = journeys.iter().min_by_key(|j| j.arrival()).unwrap();
-    assert_eq!(best.arrival(), Tau(30));
+    assert_eq!(best.arrival(), SecondOfDay(30));
     assert_eq!(
         best.plan,
         plan!(tt; (Route::R1, Stop::B), (Route::R2, Stop::C))
@@ -436,9 +518,27 @@ fn multi_trip_picks_earliest_catchable() {
         Route::R1,
         &[Stop::A, Stop::B],
         &[
-            (Trip::T1, &[(Tau(0), Tau(5)), (Tau(15), Tau(15))]),
-            (Trip::T2, &[(Tau(0), Tau(15)), (Tau(25), Tau(25))]),
-            (Trip::T3, &[(Tau(0), Tau(25)), (Tau(35), Tau(35))]),
+            (
+                Trip::T1,
+                &[
+                    (SecondOfDay(0), SecondOfDay(5)),
+                    (SecondOfDay(15), SecondOfDay(15)),
+                ],
+            ),
+            (
+                Trip::T2,
+                &[
+                    (SecondOfDay(0), SecondOfDay(15)),
+                    (SecondOfDay(25), SecondOfDay(25)),
+                ],
+            ),
+            (
+                Trip::T3,
+                &[
+                    (SecondOfDay(0), SecondOfDay(25)),
+                    (SecondOfDay(35), SecondOfDay(35)),
+                ],
+            ),
         ],
     );
 
@@ -448,10 +548,10 @@ fn multi_trip_picks_earliest_catchable() {
         .from(&[(tt.stop_idx_of(&Stop::A), Duration::ZERO)])
         .to(&[(tt.stop_idx_of(&Stop::B), Duration::ZERO)])
         .max_transfers(3u8)
-        .depart_at(Tau(12))
+        .depart_at(SecondOfDay(12))
         .run();
     assert_eq!(journeys.len(), 1);
-    assert_eq!(journeys[0].arrival(), Tau(25)); // T2 arrives B@25
+    assert_eq!(journeys[0].arrival(), SecondOfDay(25)); // T2 arrives B@25
 }
 
 #[test]
@@ -480,17 +580,35 @@ fn two_transfer_journey() {
         .route(
             Route::R1,
             &[Stop::A, Stop::B],
-            &[(Trip::T1, &[(Tau(0), Tau(0)), (Tau(10), Tau(10))])],
+            &[(
+                Trip::T1,
+                &[
+                    (SecondOfDay(0), SecondOfDay(0)),
+                    (SecondOfDay(10), SecondOfDay(10)),
+                ],
+            )],
         )
         .route(
             Route::R2,
             &[Stop::B, Stop::C],
-            &[(Trip::T2, &[(Tau(0), Tau(10)), (Tau(20), Tau(20))])],
+            &[(
+                Trip::T2,
+                &[
+                    (SecondOfDay(0), SecondOfDay(10)),
+                    (SecondOfDay(20), SecondOfDay(20)),
+                ],
+            )],
         )
         .route(
             Route::R3,
             &[Stop::C, Stop::D],
-            &[(Trip::T3, &[(Tau(0), Tau(20)), (Tau(30), Tau(30))])],
+            &[(
+                Trip::T3,
+                &[
+                    (SecondOfDay(0), SecondOfDay(20)),
+                    (SecondOfDay(30), SecondOfDay(30)),
+                ],
+            )],
         );
 
     let journeys = tt
@@ -498,11 +616,11 @@ fn two_transfer_journey() {
         .from(&[(tt.stop_idx_of(&Stop::A), Duration::ZERO)])
         .to(&[(tt.stop_idx_of(&Stop::D), Duration::ZERO)])
         .max_transfers(3u8)
-        .depart_at(Tau(0))
+        .depart_at(SecondOfDay(0))
         .run();
     assert!(!journeys.is_empty());
     let best = journeys.iter().min_by_key(|j| j.arrival()).unwrap();
-    assert_eq!(best.arrival(), Tau(30));
+    assert_eq!(best.arrival(), SecondOfDay(30));
     assert_eq!(
         best.plan,
         plan!(tt;
@@ -539,18 +657,36 @@ fn pareto_optimal_fewer_transfers_vs_faster() {
         .route(
             Route::R1,
             &[Stop::A, Stop::D],
-            &[(Trip::T1, &[(Tau(0), Tau(0)), (Tau(200), Tau(200))])],
+            &[(
+                Trip::T1,
+                &[
+                    (SecondOfDay(0), SecondOfDay(0)),
+                    (SecondOfDay(200), SecondOfDay(200)),
+                ],
+            )],
         )
         // Fast 2-leg: A→B via R2, B→D via R3
         .route(
             Route::R2,
             &[Stop::A, Stop::B],
-            &[(Trip::T2, &[(Tau(0), Tau(0)), (Tau(40), Tau(40))])],
+            &[(
+                Trip::T2,
+                &[
+                    (SecondOfDay(0), SecondOfDay(0)),
+                    (SecondOfDay(40), SecondOfDay(40)),
+                ],
+            )],
         )
         .route(
             Route::R3,
             &[Stop::B, Stop::D],
-            &[(Trip::T3, &[(Tau(0), Tau(40)), (Tau(100), Tau(100))])],
+            &[(
+                Trip::T3,
+                &[
+                    (SecondOfDay(0), SecondOfDay(40)),
+                    (SecondOfDay(100), SecondOfDay(100)),
+                ],
+            )],
         );
 
     let journeys = tt
@@ -558,17 +694,17 @@ fn pareto_optimal_fewer_transfers_vs_faster() {
         .from(&[(tt.stop_idx_of(&Stop::A), Duration::ZERO)])
         .to(&[(tt.stop_idx_of(&Stop::D), Duration::ZERO)])
         .max_transfers(3u8)
-        .depart_at(Tau(0))
+        .depart_at(SecondOfDay(0))
         .run();
     assert_eq!(journeys.len(), 2, "should have 2 pareto-optimal journeys");
 
     let mut sorted = journeys.clone();
     sorted.sort_by_key(|j| j.arrival());
     // Faster journey (2 legs)
-    assert_eq!(sorted[0].arrival(), Tau(100));
+    assert_eq!(sorted[0].arrival(), SecondOfDay(100));
     assert_eq!(sorted[0].plan.len(), 2);
     // Slower direct journey (1 leg)
-    assert_eq!(sorted[1].arrival(), Tau(200));
+    assert_eq!(sorted[1].arrival(), SecondOfDay(200));
     assert_eq!(sorted[1].plan.len(), 1);
 }
 
@@ -596,12 +732,24 @@ fn footpath_enables_connection() {
         .route(
             Route::R1,
             &[Stop::A, Stop::B],
-            &[(Trip::T1, &[(Tau(0), Tau(0)), (Tau(10), Tau(10))])],
+            &[(
+                Trip::T1,
+                &[
+                    (SecondOfDay(0), SecondOfDay(0)),
+                    (SecondOfDay(10), SecondOfDay(10)),
+                ],
+            )],
         )
         .route(
             Route::R2,
             &[Stop::C, Stop::D],
-            &[(Trip::T2, &[(Tau(0), Tau(20)), (Tau(30), Tau(30))])],
+            &[(
+                Trip::T2,
+                &[
+                    (SecondOfDay(0), SecondOfDay(20)),
+                    (SecondOfDay(30), SecondOfDay(30)),
+                ],
+            )],
         )
         .footpath(Stop::B, Stop::C)
         .transfer_time(Stop::B, Stop::C, Duration(5));
@@ -614,10 +762,10 @@ fn footpath_enables_connection() {
         .from(&[(tt.stop_idx_of(&Stop::A), Duration::ZERO)])
         .to(&[(tt.stop_idx_of(&Stop::D), Duration::ZERO)])
         .max_transfers(3u8)
-        .depart_at(Tau(0))
+        .depart_at(SecondOfDay(0))
         .run();
     assert_eq!(journeys.len(), 1, "expected one journey, got {journeys:?}");
-    assert_eq!(journeys[0].arrival(), Tau(30));
+    assert_eq!(journeys[0].arrival(), SecondOfDay(30));
     assert_eq!(
         journeys[0].plan,
         plan!(tt; (Route::R1, Stop::B), (Route::R2, Stop::D))
@@ -648,12 +796,24 @@ fn footpath_transfer_time_causes_miss() {
         .route(
             Route::R1,
             &[Stop::A, Stop::B],
-            &[(Trip::T1, &[(Tau(0), Tau(0)), (Tau(50), Tau(50))])],
+            &[(
+                Trip::T1,
+                &[
+                    (SecondOfDay(0), SecondOfDay(0)),
+                    (SecondOfDay(50), SecondOfDay(50)),
+                ],
+            )],
         )
         .route(
             Route::R2,
             &[Stop::C, Stop::D],
-            &[(Trip::T2, &[(Tau(0), Tau(52)), (Tau(60), Tau(60))])],
+            &[(
+                Trip::T2,
+                &[
+                    (SecondOfDay(0), SecondOfDay(52)),
+                    (SecondOfDay(60), SecondOfDay(60)),
+                ],
+            )],
         )
         .footpath(Stop::B, Stop::C)
         .transfer_time(Stop::B, Stop::C, Duration(5)); // 50+5=55 > 52
@@ -663,7 +823,7 @@ fn footpath_transfer_time_causes_miss() {
         .from(&[(tt.stop_idx_of(&Stop::A), Duration::ZERO)])
         .to(&[(tt.stop_idx_of(&Stop::D), Duration::ZERO)])
         .max_transfers(3u8)
-        .depart_at(Tau(0))
+        .depart_at(SecondOfDay(0))
         .run();
     assert!(
         journeys.is_empty(),
@@ -690,7 +850,13 @@ fn early_termination_no_improvement() {
     let tt = SimpleTimetable::new().route(
         Route::R1,
         &[Stop::A, Stop::B],
-        &[(Trip::T1, &[(Tau(0), Tau(0)), (Tau(10), Tau(10))])],
+        &[(
+            Trip::T1,
+            &[
+                (SecondOfDay(0), SecondOfDay(0)),
+                (SecondOfDay(10), SecondOfDay(10)),
+            ],
+        )],
     );
 
     let j1 = tt
@@ -698,14 +864,14 @@ fn early_termination_no_improvement() {
         .from(&[(tt.stop_idx_of(&Stop::A), Duration::ZERO)])
         .to(&[(tt.stop_idx_of(&Stop::B), Duration::ZERO)])
         .max_transfers(1u8)
-        .depart_at(Tau(0))
+        .depart_at(SecondOfDay(0))
         .run();
     let j100 = tt
         .query()
         .from(&[(tt.stop_idx_of(&Stop::A), Duration::ZERO)])
         .to(&[(tt.stop_idx_of(&Stop::B), Duration::ZERO)])
         .max_transfers(100u8)
-        .depart_at(Tau(0))
+        .depart_at(SecondOfDay(0))
         .run();
 
     assert_eq!(j1.len(), j100.len());
@@ -737,12 +903,24 @@ fn dominance_prunes_slower_arrival() {
         .route(
             Route::R1,
             &[Stop::A, Stop::B],
-            &[(Trip::T1, &[(Tau(0), Tau(0)), (Tau(50), Tau(50))])],
+            &[(
+                Trip::T1,
+                &[
+                    (SecondOfDay(0), SecondOfDay(0)),
+                    (SecondOfDay(50), SecondOfDay(50)),
+                ],
+            )],
         )
         .route(
             Route::R2,
             &[Stop::A, Stop::B],
-            &[(Trip::T2, &[(Tau(0), Tau(0)), (Tau(100), Tau(100))])],
+            &[(
+                Trip::T2,
+                &[
+                    (SecondOfDay(0), SecondOfDay(0)),
+                    (SecondOfDay(100), SecondOfDay(100)),
+                ],
+            )],
         );
 
     let journeys = tt
@@ -750,11 +928,11 @@ fn dominance_prunes_slower_arrival() {
         .from(&[(tt.stop_idx_of(&Stop::A), Duration::ZERO)])
         .to(&[(tt.stop_idx_of(&Stop::B), Duration::ZERO)])
         .max_transfers(3u8)
-        .depart_at(Tau(0))
+        .depart_at(SecondOfDay(0))
         .run();
     // Both routes are discovered in round 1, so the slower one is dominated
     assert_eq!(journeys.len(), 1, "dominated journey should be pruned");
-    assert_eq!(journeys[0].arrival(), Tau(50));
+    assert_eq!(journeys[0].arrival(), SecondOfDay(50));
 }
 
 #[test]
@@ -780,25 +958,37 @@ fn raptor_with_cache_matches_fresh_run() {
         .route(
             Route::R1,
             &[Stop::A, Stop::B],
-            &[(Trip::T1, &[(Tau(0), Tau(0)), (Tau(10), Tau(10))])],
+            &[(
+                Trip::T1,
+                &[
+                    (SecondOfDay(0), SecondOfDay(0)),
+                    (SecondOfDay(10), SecondOfDay(10)),
+                ],
+            )],
         )
         .route(
             Route::R2,
             &[Stop::B, Stop::C],
-            &[(Trip::T2, &[(Tau(15), Tau(15)), (Tau(25), Tau(25))])],
+            &[(
+                Trip::T2,
+                &[
+                    (SecondOfDay(15), SecondOfDay(15)),
+                    (SecondOfDay(25), SecondOfDay(25)),
+                ],
+            )],
         );
 
     // Run several queries with varying parameters through one cache and
     // confirm each result matches a fresh-run baseline.
     let queries = [
-        (3, Tau(0), Stop::A, Stop::C),
-        (1, Tau(0), Stop::A, Stop::B),
-        (5, Tau(5), Stop::A, Stop::C),
-        (2, Tau(0), Stop::B, Stop::C),
+        (3, SecondOfDay(0), Stop::A, Stop::C),
+        (1, SecondOfDay(0), Stop::A, Stop::B),
+        (5, SecondOfDay(5), Stop::A, Stop::C),
+        (2, SecondOfDay(0), Stop::B, Stop::C),
     ];
 
     let mut cache: RaptorCache = RaptorCache::for_timetable(&tt);
-    for &(transfers, tau, ps, pt) in &queries {
+    for &(transfers, depart, ps, pt) in &queries {
         let ps_idx = tt.stop_idx_of(&ps);
         let pt_idx = tt.stop_idx_of(&pt);
         let baseline = tt
@@ -806,14 +996,14 @@ fn raptor_with_cache_matches_fresh_run() {
             .from(&[(ps_idx, Duration::ZERO)])
             .to(&[(pt_idx, Duration::ZERO)])
             .max_transfers(transfers as u8)
-            .depart_at(tau)
+            .depart_at(depart)
             .run();
         let cached = tt
             .query()
             .from(&[(ps_idx, Duration::ZERO)])
             .to(&[(pt_idx, Duration::ZERO)])
             .max_transfers(transfers as u8)
-            .depart_at(tau)
+            .depart_at(depart)
             .run_with_cache(&mut cache);
         assert_eq!(
             cached.len(),
@@ -857,12 +1047,24 @@ fn multi_source_picks_best_origin() {
         .route(
             RFast,
             &[A, C],
-            &[(TFast, &[(Tau(0), Tau(0)), (Tau(10), Tau(10))])],
+            &[(
+                TFast,
+                &[
+                    (SecondOfDay(0), SecondOfDay(0)),
+                    (SecondOfDay(10), SecondOfDay(10)),
+                ],
+            )],
         )
         .route(
             RSlow,
             &[B, C],
-            &[(TSlow, &[(Tau(0), Tau(0)), (Tau(30), Tau(30))])],
+            &[(
+                TSlow,
+                &[
+                    (SecondOfDay(0), SecondOfDay(0)),
+                    (SecondOfDay(30), SecondOfDay(30)),
+                ],
+            )],
         );
 
     let a = tt.stop_idx_of(&A);
@@ -874,10 +1076,10 @@ fn multi_source_picks_best_origin() {
         .from(&[(a, Duration::ZERO), (b, Duration::ZERO)])
         .to(&[(c, Duration::ZERO)])
         .max_transfers(3u8)
-        .depart_at(Tau(0))
+        .depart_at(SecondOfDay(0))
         .run();
     assert_eq!(journeys.len(), 1, "one Pareto-optimal journey expected");
-    assert_eq!(journeys[0].arrival(), Tau(10));
+    assert_eq!(journeys[0].arrival(), SecondOfDay(10));
     assert_eq!(
         journeys[0].origin, a,
         "should have started at A (the faster route)"
@@ -919,12 +1121,24 @@ fn multi_source_walk_offset_changes_best_origin() {
         .route(
             RFast,
             &[A, C],
-            &[(TFast, &[(Tau(30), Tau(30)), (Tau(40), Tau(40))])],
+            &[(
+                TFast,
+                &[
+                    (SecondOfDay(30), SecondOfDay(30)),
+                    (SecondOfDay(40), SecondOfDay(40)),
+                ],
+            )],
         )
         .route(
             RSlow,
             &[B, C],
-            &[(TSlow, &[(Tau(0), Tau(0)), (Tau(30), Tau(30))])],
+            &[(
+                TSlow,
+                &[
+                    (SecondOfDay(0), SecondOfDay(0)),
+                    (SecondOfDay(30), SecondOfDay(30)),
+                ],
+            )],
         );
 
     let a = tt.stop_idx_of(&A);
@@ -940,10 +1154,10 @@ fn multi_source_walk_offset_changes_best_origin() {
         .from(&[(a, Duration(30)), (b, Duration::ZERO)])
         .to(&[(c, Duration::ZERO)])
         .max_transfers(3u8)
-        .depart_at(Tau(0))
+        .depart_at(SecondOfDay(0))
         .run();
     let best = journeys.iter().min_by_key(|j| j.arrival()).unwrap();
-    assert_eq!(best.arrival(), Tau(30));
+    assert_eq!(best.arrival(), SecondOfDay(30));
     assert_eq!(
         best.origin, b,
         "should have started at B (closer + slow trip wins)"
@@ -975,12 +1189,24 @@ fn multi_target_walk_offset_picks_best_target() {
         .route(
             Route::R1,
             &[Stop::A, Stop::T1],
-            &[(Trip::Tr1, &[(Tau(0), Tau(0)), (Tau(10), Tau(10))])],
+            &[(
+                Trip::Tr1,
+                &[
+                    (SecondOfDay(0), SecondOfDay(0)),
+                    (SecondOfDay(10), SecondOfDay(10)),
+                ],
+            )],
         )
         .route(
             Route::R2,
             &[Stop::A, Stop::T2],
-            &[(Trip::Tr2, &[(Tau(0), Tau(0)), (Tau(25), Tau(25))])],
+            &[(
+                Trip::Tr2,
+                &[
+                    (SecondOfDay(0), SecondOfDay(0)),
+                    (SecondOfDay(25), SecondOfDay(25)),
+                ],
+            )],
         );
 
     let a = tt.stop_idx_of(&Stop::A);
@@ -992,12 +1218,12 @@ fn multi_target_walk_offset_picks_best_target() {
         .from(&[(a, Duration::ZERO)])
         .to(&[(t1, Duration(30)), (t2, Duration::ZERO)])
         .max_transfers(3u8)
-        .depart_at(Tau(0))
+        .depart_at(SecondOfDay(0))
         .run();
     let best = journeys.iter().min_by_key(|j| j.arrival()).unwrap();
     // best raw arrival at T1 = 10, +30 walk = 40 effective
     // best raw arrival at T2 = 25, +0 walk = 25 effective → wins
-    assert_eq!(best.arrival(), Tau(25));
+    assert_eq!(best.arrival(), SecondOfDay(25));
     assert_eq!(best.target, t2);
 }
 
@@ -1025,16 +1251,20 @@ fn query_builder_single_departure() {
         &[S::A, S::B, S::C],
         &[(
             Tr::T1,
-            &[(Tau(0), Tau(0)), (Tau(10), Tau(10)), (Tau(20), Tau(20))],
+            &[
+                (SecondOfDay(0), SecondOfDay(0)),
+                (SecondOfDay(10), SecondOfDay(10)),
+                (SecondOfDay(20), SecondOfDay(20)),
+            ],
         )],
     );
     let a = tt.stop_idx_of(&S::A);
     let c = tt.stop_idx_of(&S::C);
 
     // 1. Bare typestate flow with all defaults except from/to/depart_at.
-    let journeys = tt.query().from(a).to(c).depart_at(Tau(0)).run();
+    let journeys = tt.query().from(a).to(c).depart_at(SecondOfDay(0)).run();
     assert_eq!(journeys.len(), 1);
-    assert_eq!(journeys[0].arrival(), Tau(20));
+    assert_eq!(journeys[0].arrival(), SecondOfDay(20));
 
     // 2. With max_transfers and a u8 literal (Into<Transfers>).
     let journeys = tt
@@ -1042,7 +1272,7 @@ fn query_builder_single_departure() {
         .from(a)
         .to(c)
         .max_transfers(3u8)
-        .depart_at(Tau(0))
+        .depart_at(SecondOfDay(0))
         .run();
     assert_eq!(journeys.len(), 1);
 
@@ -1052,7 +1282,7 @@ fn query_builder_single_departure() {
         .query()
         .from(a)
         .to(c)
-        .depart_at(Tau(0))
+        .depart_at(SecondOfDay(0))
         .run_with_cache(&mut cache);
     assert_eq!(journeys.len(), 1);
 
@@ -1061,7 +1291,7 @@ fn query_builder_single_departure() {
         .query_with_label::<ArrivalAndWalk>()
         .from(a)
         .to(c)
-        .depart_at(Tau(0))
+        .depart_at(SecondOfDay(0))
         .run();
     assert_eq!(journeys.len(), 1);
     assert_eq!(journeys[0].label.walk_time, Duration::ZERO);
@@ -1089,9 +1319,27 @@ fn query_builder_range_departure() {
         R::R1,
         &[S::A, S::B],
         &[
-            (Tr::T1, &[(Tau(0), Tau(0)), (Tau(10), Tau(10))]),
-            (Tr::T2, &[(Tau(10), Tau(10)), (Tau(20), Tau(20))]),
-            (Tr::T3, &[(Tau(20), Tau(20)), (Tau(30), Tau(30))]),
+            (
+                Tr::T1,
+                &[
+                    (SecondOfDay(0), SecondOfDay(0)),
+                    (SecondOfDay(10), SecondOfDay(10)),
+                ],
+            ),
+            (
+                Tr::T2,
+                &[
+                    (SecondOfDay(10), SecondOfDay(10)),
+                    (SecondOfDay(20), SecondOfDay(20)),
+                ],
+            ),
+            (
+                Tr::T3,
+                &[
+                    (SecondOfDay(20), SecondOfDay(20)),
+                    (SecondOfDay(30), SecondOfDay(30)),
+                ],
+            ),
         ],
     );
     let a = tt.stop_idx_of(&S::A);
@@ -1101,17 +1349,27 @@ fn query_builder_range_departure() {
         .query()
         .from(a)
         .to(b)
-        .depart_in_window([Tau(0), Tau(5), Tau(10), Tau(15), Tau(20)])
+        .depart_in_window([
+            SecondOfDay(0),
+            SecondOfDay(5),
+            SecondOfDay(10),
+            SecondOfDay(15),
+            SecondOfDay(20),
+        ])
         .run();
 
-    let mut points: Vec<(Tau, Tau)> = profile
+    let mut points: Vec<(SecondOfDay, SecondOfDay)> = profile
         .iter()
         .map(|p| (p.depart, p.journey.arrival()))
         .collect();
     points.sort();
     assert_eq!(
         points,
-        vec![(Tau(0), Tau(10)), (Tau(10), Tau(20)), (Tau(20), Tau(30))]
+        vec![
+            (SecondOfDay(0), SecondOfDay(10)),
+            (SecondOfDay(10), SecondOfDay(20)),
+            (SecondOfDay(20), SecondOfDay(30))
+        ]
     );
 }
 
@@ -1139,7 +1397,11 @@ fn into_endpoints_accepts_natural_input_shapes() {
         &[S::A, S::B, S::C],
         &[(
             Tr::T1,
-            &[(Tau(0), Tau(0)), (Tau(10), Tau(10)), (Tau(20), Tau(20))],
+            &[
+                (SecondOfDay(0), SecondOfDay(0)),
+                (SecondOfDay(10), SecondOfDay(10)),
+                (SecondOfDay(20), SecondOfDay(20)),
+            ],
         )],
     );
     let a = tt.stop_idx_of(&S::A);
@@ -1152,10 +1414,10 @@ fn into_endpoints_accepts_natural_input_shapes() {
         .from(a)
         .to(c)
         .max_transfers(3u8)
-        .depart_at(Tau(0))
+        .depart_at(SecondOfDay(0))
         .run();
     assert_eq!(j.len(), 1);
-    assert_eq!(j[0].arrival(), Tau(20));
+    assert_eq!(j[0].arrival(), SecondOfDay(20));
 
     // 2. (StopIdx, Duration) pair as a single endpoint with explicit walk.
     //    Walk-time offset of 0 should match the bare-stop behaviour above.
@@ -1164,9 +1426,9 @@ fn into_endpoints_accepts_natural_input_shapes() {
         .from((a, Duration::ZERO))
         .to(c)
         .max_transfers(3u8)
-        .depart_at(Tau(0))
+        .depart_at(SecondOfDay(0))
         .run();
-    assert_eq!(j[0].arrival(), Tau(20));
+    assert_eq!(j[0].arrival(), SecondOfDay(20));
 
     // 3. Slice of stops (multi-source / multi-target with walk = 0).
     let stops = [a, b];
@@ -1175,9 +1437,9 @@ fn into_endpoints_accepts_natural_input_shapes() {
         .from(&stops[..])
         .to(c)
         .max_transfers(3u8)
-        .depart_at(Tau(0))
+        .depart_at(SecondOfDay(0))
         .run();
-    assert_eq!(j[0].arrival(), Tau(20));
+    assert_eq!(j[0].arrival(), SecondOfDay(20));
 
     // 4. Slice of (stop, duration) pairs — original v0.13 shape.
     let pairs = [(a, Duration::ZERO)];
@@ -1186,9 +1448,9 @@ fn into_endpoints_accepts_natural_input_shapes() {
         .from(&pairs[..])
         .to(&[(c, Duration::ZERO)][..])
         .max_transfers(3u8)
-        .depart_at(Tau(0))
+        .depart_at(SecondOfDay(0))
         .run();
-    assert_eq!(j[0].arrival(), Tau(20));
+    assert_eq!(j[0].arrival(), SecondOfDay(20));
 
     // 5. Owned Vec of (stop, duration) pairs.
     let owned = vec![(a, Duration::ZERO)];
@@ -1197,9 +1459,9 @@ fn into_endpoints_accepts_natural_input_shapes() {
         .from(&owned)
         .to(c)
         .max_transfers(3u8)
-        .depart_at(Tau(0))
+        .depart_at(SecondOfDay(0))
         .run();
-    assert_eq!(j[0].arrival(), Tau(20));
+    assert_eq!(j[0].arrival(), SecondOfDay(20));
 
     // 6. Pre-built Endpoints.
     let mut ep = crate::Endpoints::new();
@@ -1209,14 +1471,14 @@ fn into_endpoints_accepts_natural_input_shapes() {
         .from(ep)
         .to(c)
         .max_transfers(3u8)
-        .depart_at(Tau(0))
+        .depart_at(SecondOfDay(0))
         .run();
-    assert_eq!(j[0].arrival(), Tau(20));
+    assert_eq!(j[0].arrival(), SecondOfDay(20));
 }
 
 #[test]
 fn closed_path_dispatch_matches_dijkstra() {
-    use crate::{RouteIdx, StopIdx, Tau, TripIdx};
+    use crate::{RouteIdx, SecondOfDay, StopIdx, TripIdx};
 
     // Newtype wrapper that delegates everything to its inner timetable
     // but reports the footpath relation as transitively closed. Run the
@@ -1239,13 +1501,13 @@ fn closed_path_dispatch_matches_dijkstra() {
         fn stop_at(&self, route: RouteIdx, pos: u32) -> StopIdx {
             self.0.stop_at(route, pos)
         }
-        fn get_earliest_trip(&self, route: RouteIdx, at: Tau, pos: u32) -> Option<TripIdx> {
+        fn get_earliest_trip(&self, route: RouteIdx, at: SecondOfDay, pos: u32) -> Option<TripIdx> {
             self.0.get_earliest_trip(route, at, pos)
         }
-        fn get_arrival_time(&self, trip: TripIdx, pos: u32) -> Tau {
+        fn get_arrival_time(&self, trip: TripIdx, pos: u32) -> SecondOfDay {
             self.0.get_arrival_time(trip, pos)
         }
-        fn get_departure_time(&self, trip: TripIdx, pos: u32) -> Tau {
+        fn get_departure_time(&self, trip: TripIdx, pos: u32) -> SecondOfDay {
             self.0.get_departure_time(trip, pos)
         }
         fn get_footpaths_from(&self, stop: StopIdx) -> &[StopIdx] {
@@ -1283,12 +1545,24 @@ fn closed_path_dispatch_matches_dijkstra() {
         .route(
             R::R1,
             &[S::A, S::B],
-            &[(Tr::T1, &[(Tau(0), Tau(0)), (Tau(10), Tau(10))])],
+            &[(
+                Tr::T1,
+                &[
+                    (SecondOfDay(0), SecondOfDay(0)),
+                    (SecondOfDay(10), SecondOfDay(10)),
+                ],
+            )],
         )
         .route(
             R::R2,
             &[S::C, S::D],
-            &[(Tr::T2, &[(Tau(0), Tau(15)), (Tau(25), Tau(25))])],
+            &[(
+                Tr::T2,
+                &[
+                    (SecondOfDay(0), SecondOfDay(15)),
+                    (SecondOfDay(25), SecondOfDay(25)),
+                ],
+            )],
         )
         .footpath(S::B, S::C)
         .transfer_time(S::B, S::C, Duration(3));
@@ -1301,14 +1575,14 @@ fn closed_path_dispatch_matches_dijkstra() {
         .from(&[(a, Duration::ZERO)])
         .to(&[(d, Duration::ZERO)])
         .max_transfers(3u8)
-        .depart_at(Tau(0))
+        .depart_at(SecondOfDay(0))
         .run();
     let closed = ClosedAssert(inner)
         .query()
         .from(a)
         .to(d)
         .max_transfers(3u8)
-        .depart_at(Tau(0))
+        .depart_at(SecondOfDay(0))
         .run();
 
     assert_eq!(dijkstra.len(), closed.len(), "journey count must match");
@@ -1348,9 +1622,19 @@ fn arrival_and_walk_label_tracks_accumulated_walk_time() {
         .route(
             R::R1,
             &[S::A, S::B],
-            &[(Tr::T1, &[(Tau(0), Tau(0)), (Tau(10), Tau(10))])],
+            &[(
+                Tr::T1,
+                &[
+                    (SecondOfDay(0), SecondOfDay(0)),
+                    (SecondOfDay(10), SecondOfDay(10)),
+                ],
+            )],
         )
-        .route(R::R2, &[S::C], &[(Tr::T2, &[(Tau(20), Tau(20))])])
+        .route(
+            R::R2,
+            &[S::C],
+            &[(Tr::T2, &[(SecondOfDay(20), SecondOfDay(20))])],
+        )
         .footpath(S::B, S::C)
         .transfer_time(S::B, S::C, Duration(7));
 
@@ -1363,10 +1647,10 @@ fn arrival_and_walk_label_tracks_accumulated_walk_time() {
         .from(&[(a, Duration::ZERO)])
         .to(&[(c, Duration::ZERO)])
         .max_transfers(3u8)
-        .depart_at(Tau(0))
+        .depart_at(SecondOfDay(0))
         .run();
     assert!(!default_journeys.is_empty());
-    assert_eq!(default_journeys[0].arrival(), Tau(17)); // 10 + 7
+    assert_eq!(default_journeys[0].arrival(), SecondOfDay(17)); // 10 + 7
 
     // Public ArrivalAndWalk via the labeled query builder.
     let label_journeys: Vec<crate::Journey<ArrivalAndWalk>> = tt
@@ -1374,10 +1658,10 @@ fn arrival_and_walk_label_tracks_accumulated_walk_time() {
         .from(a)
         .to(c)
         .max_transfers(3u8)
-        .depart_at(Tau(0))
+        .depart_at(SecondOfDay(0))
         .run();
     assert_eq!(label_journeys.len(), default_journeys.len());
-    assert_eq!(label_journeys[0].arrival(), Tau(17));
+    assert_eq!(label_journeys[0].arrival(), SecondOfDay(17));
     assert_eq!(
         label_journeys[0].label.walk_time,
         Duration(7),
@@ -1391,7 +1675,7 @@ fn arrival_and_walk_label_tracks_accumulated_walk_time() {
         .from(a)
         .to(c)
         .max_transfers(3u8)
-        .depart_at(Tau(0))
+        .depart_at(SecondOfDay(0))
         .run_with_cache(&mut cache);
     assert_eq!(cached.len(), 1);
     assert_eq!(cached[0].label.walk_time, Duration(7));
@@ -1428,9 +1712,27 @@ fn raptor_range_returns_pareto_profile_across_departures() {
         R::R1,
         &[S::A, S::B],
         &[
-            (Tr::T1, &[(Tau(0), Tau(0)), (Tau(10), Tau(10))]),
-            (Tr::T2, &[(Tau(10), Tau(10)), (Tau(20), Tau(20))]),
-            (Tr::T3, &[(Tau(20), Tau(20)), (Tau(30), Tau(30))]),
+            (
+                Tr::T1,
+                &[
+                    (SecondOfDay(0), SecondOfDay(0)),
+                    (SecondOfDay(10), SecondOfDay(10)),
+                ],
+            ),
+            (
+                Tr::T2,
+                &[
+                    (SecondOfDay(10), SecondOfDay(10)),
+                    (SecondOfDay(20), SecondOfDay(20)),
+                ],
+            ),
+            (
+                Tr::T3,
+                &[
+                    (SecondOfDay(20), SecondOfDay(20)),
+                    (SecondOfDay(30), SecondOfDay(30)),
+                ],
+            ),
         ],
     );
 
@@ -1442,10 +1744,16 @@ fn raptor_range_returns_pareto_profile_across_departures() {
         .from(&[(a, Duration::ZERO)])
         .to(&[(b, Duration::ZERO)])
         .max_transfers(3u8)
-        .depart_in_window([Tau(0), Tau(5), Tau(10), Tau(15), Tau(20)])
+        .depart_in_window([
+            SecondOfDay(0),
+            SecondOfDay(5),
+            SecondOfDay(10),
+            SecondOfDay(15),
+            SecondOfDay(20),
+        ])
         .run();
 
-    let mut points: Vec<(crate::Tau, crate::Tau)> = profile
+    let mut points: Vec<(crate::SecondOfDay, crate::SecondOfDay)> = profile
         .iter()
         .map(|p| (p.depart, p.journey.arrival()))
         .collect();
@@ -1453,7 +1761,11 @@ fn raptor_range_returns_pareto_profile_across_departures() {
 
     assert_eq!(
         points,
-        vec![(Tau(0), Tau(10)), (Tau(10), Tau(20)), (Tau(20), Tau(30))]
+        vec![
+            (SecondOfDay(0), SecondOfDay(10)),
+            (SecondOfDay(10), SecondOfDay(20)),
+            (SecondOfDay(20), SecondOfDay(30))
+        ]
     );
 }
 
@@ -1491,12 +1803,24 @@ fn arrival_and_walk_returns_pareto_front() {
         .route(
             R::R1,
             &[S::A, S::X],
-            &[(Tr::T1, &[(Tau(0), Tau(0)), (Tau(10), Tau(10))])],
+            &[(
+                Tr::T1,
+                &[
+                    (SecondOfDay(0), SecondOfDay(0)),
+                    (SecondOfDay(10), SecondOfDay(10)),
+                ],
+            )],
         )
         .route(
             R::R2,
             &[S::A, S::Y],
-            &[(Tr::T2, &[(Tau(0), Tau(0)), (Tau(20), Tau(20))])],
+            &[(
+                Tr::T2,
+                &[
+                    (SecondOfDay(0), SecondOfDay(0)),
+                    (SecondOfDay(20), SecondOfDay(20)),
+                ],
+            )],
         )
         .footpath(S::X, S::T)
         .transfer_time(S::X, S::T, Duration(5))
@@ -1512,10 +1836,10 @@ fn arrival_and_walk_returns_pareto_front() {
         .from(&[(a, Duration::ZERO)])
         .to(&[(t, Duration::ZERO)])
         .max_transfers(3u8)
-        .depart_at(Tau(0))
+        .depart_at(SecondOfDay(0))
         .run();
     assert_eq!(arrival_only.len(), 1);
-    assert_eq!(arrival_only[0].arrival(), Tau(15));
+    assert_eq!(arrival_only[0].arrival(), SecondOfDay(15));
 
     // ArrivalAndWalk: both Pareto-incomparable journeys are returned.
     let pareto: Vec<crate::Journey<ArrivalAndWalk>> = tt
@@ -1523,7 +1847,7 @@ fn arrival_and_walk_returns_pareto_front() {
         .from(a)
         .to(t)
         .max_transfers(3u8)
-        .depart_at(Tau(0))
+        .depart_at(SecondOfDay(0))
         .run();
     assert_eq!(
         pareto.len(),
@@ -1534,9 +1858,9 @@ fn arrival_and_walk_returns_pareto_front() {
     );
     let mut labels: Vec<_> = pareto.iter().map(|j| j.label).collect();
     labels.sort_by_key(|l| l.arrival);
-    assert_eq!(labels[0].arrival, Tau(15));
+    assert_eq!(labels[0].arrival, SecondOfDay(15));
     assert_eq!(labels[0].walk_time, Duration(5));
-    assert_eq!(labels[1].arrival, Tau(21));
+    assert_eq!(labels[1].arrival, SecondOfDay(21));
     assert_eq!(labels[1].walk_time, Duration(1));
 }
 
@@ -1570,14 +1894,32 @@ fn with_timing_recovers_per_leg_trip_and_times() {
             R::R1,
             &[S::A, S::B],
             &[
-                (Tr::T1Early, &[(Tau(0), Tau(0)), (Tau(10), Tau(10))]),
-                (Tr::T1Late, &[(Tau(50), Tau(50)), (Tau(60), Tau(60))]),
+                (
+                    Tr::T1Early,
+                    &[
+                        (SecondOfDay(0), SecondOfDay(0)),
+                        (SecondOfDay(10), SecondOfDay(10)),
+                    ],
+                ),
+                (
+                    Tr::T1Late,
+                    &[
+                        (SecondOfDay(50), SecondOfDay(50)),
+                        (SecondOfDay(60), SecondOfDay(60)),
+                    ],
+                ),
             ],
         )
         .route(
             R::R2,
             &[S::B, S::C],
-            &[(Tr::T2, &[(Tau(12), Tau(12)), (Tau(25), Tau(25))])],
+            &[(
+                Tr::T2,
+                &[
+                    (SecondOfDay(12), SecondOfDay(12)),
+                    (SecondOfDay(25), SecondOfDay(25)),
+                ],
+            )],
         );
 
     let a = tt.stop_idx_of(&S::A);
@@ -1589,14 +1931,14 @@ fn with_timing_recovers_per_leg_trip_and_times() {
         .from(&[(a, Duration::ZERO)])
         .to(&[(c, Duration::ZERO)])
         .max_transfers(3u8)
-        .depart_at(Tau(0))
+        .depart_at(SecondOfDay(0))
         .run();
     assert_eq!(journeys.len(), 1);
     let j = &journeys[0];
-    assert_eq!(j.arrival(), Tau(25));
+    assert_eq!(j.arrival(), SecondOfDay(25));
 
     let timed = j
-        .with_timing(&tt, Tau(0), Duration::ZERO)
+        .with_timing(&tt, SecondOfDay(0), Duration::ZERO)
         .expect("plan must reconstruct");
     assert_eq!(timed.len(), 2);
 
@@ -1606,8 +1948,8 @@ fn with_timing_recovers_per_leg_trip_and_times() {
     assert_eq!(l1.board, a);
     assert_eq!(l1.alight, b);
     assert_eq!(l1.trip, tt.trip_idx_of(&Tr::T1Early));
-    assert_eq!(l1.depart, Tau(0));
-    assert_eq!(l1.arrive, Tau(10));
+    assert_eq!(l1.depart, SecondOfDay(0));
+    assert_eq!(l1.arrive, SecondOfDay(10));
 
     // Leg 2: B -> C on R2 catching T2.
     let l2 = &timed[1];
@@ -1615,8 +1957,8 @@ fn with_timing_recovers_per_leg_trip_and_times() {
     assert_eq!(l2.board, b);
     assert_eq!(l2.alight, c);
     assert_eq!(l2.trip, tt.trip_idx_of(&Tr::T2));
-    assert_eq!(l2.depart, Tau(12));
-    assert_eq!(l2.arrive, Tau(25));
+    assert_eq!(l2.depart, SecondOfDay(12));
+    assert_eq!(l2.arrive, SecondOfDay(25));
 }
 
 #[test]
@@ -1647,12 +1989,24 @@ fn with_timing_handles_one_hop_walking_transfer() {
         .route(
             R::R1,
             &[S::A, S::B],
-            &[(Tr::T1, &[(Tau(0), Tau(0)), (Tau(10), Tau(10))])],
+            &[(
+                Tr::T1,
+                &[
+                    (SecondOfDay(0), SecondOfDay(0)),
+                    (SecondOfDay(10), SecondOfDay(10)),
+                ],
+            )],
         )
         .route(
             R::R2,
             &[S::C, S::D],
-            &[(Tr::T2, &[(Tau(20), Tau(20)), (Tau(30), Tau(30))])],
+            &[(
+                Tr::T2,
+                &[
+                    (SecondOfDay(20), SecondOfDay(20)),
+                    (SecondOfDay(30), SecondOfDay(30)),
+                ],
+            )],
         )
         .footpath(S::B, S::C)
         .transfer_time(S::B, S::C, Duration(5));
@@ -1667,13 +2021,13 @@ fn with_timing_handles_one_hop_walking_transfer() {
         .from(&[(a, Duration::ZERO)])
         .to(&[(d, Duration::ZERO)])
         .max_transfers(3u8)
-        .depart_at(Tau(0))
+        .depart_at(SecondOfDay(0))
         .run();
     assert_eq!(journeys.len(), 1);
     let j = &journeys[0];
 
     let timed = j
-        .with_timing(&tt, Tau(0), Duration::ZERO)
+        .with_timing(&tt, SecondOfDay(0), Duration::ZERO)
         .expect("plan must reconstruct");
     assert_eq!(timed.len(), 2);
 
@@ -1683,6 +2037,6 @@ fn with_timing_handles_one_hop_walking_transfer() {
     let l2 = &timed[1];
     assert_eq!(l2.board, c, "leg 2 boards at C, not B (walking transfer)");
     assert_eq!(l2.alight, d);
-    assert_eq!(l2.depart, Tau(20));
-    assert_eq!(l2.arrive, Tau(30));
+    assert_eq!(l2.depart, SecondOfDay(20));
+    assert_eq!(l2.arrive, SecondOfDay(30));
 }

@@ -37,7 +37,7 @@ fn main() -> anyhow::Result<()> {
         .stop_idx(target)
         .ok_or_else(|| anyhow::anyhow!("unknown target stop: {target}"))?;
 
-    let departure_time = raptor::Tau::hms(19, 15, 0);
+    let departure_time = raptor::SecondOfDay::hms(19, 15, 0);
     let journeys = timetable
         .query()
         .from(&[(start_idx, Duration::ZERO)])

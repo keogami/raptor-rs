@@ -6,7 +6,7 @@ use std::collections::HashMap;
 use std::fmt::Debug;
 use std::hash::Hash;
 
-use crate::{Duration, RouteIdx, StopIdx, Tau, Timetable, TripIdx};
+use crate::{Duration, RouteIdx, SecondOfDay, StopIdx, Timetable, TripIdx};
 
 /// A generic in-memory timetable backed by interning tables and dense `Vec`s.
 ///
@@ -33,7 +33,7 @@ where
     /// the vector when a `TripIdx` lands past the current end, but never
     /// silently fills those holes with a placeholder route.
     #[allow(clippy::type_complexity)]
-    trips: Vec<Option<(RouteIdx, Vec<(Tau, Tau)>)>>,
+    trips: Vec<Option<(RouteIdx, Vec<(SecondOfDay, SecondOfDay)>)>>,
     /// StopIdx -> reachable stops via footpath.
     footpaths: Vec<Vec<StopIdx>>,
     /// (from, to) -> transfer time.
@@ -102,7 +102,7 @@ where
     }
 
     /// Adds a route with its stops and trips.
-    pub fn route(mut self, id: R, stops: &[S], trips: &[(T, &[(Tau, Tau)])]) -> Self
+    pub fn route(mut self, id: R, stops: &[S], trips: &[(T, &[(SecondOfDay, SecondOfDay)])]) -> Self
     where
         R: Debug,
         T: Debug,
@@ -230,7 +230,7 @@ where
         self.routes[route.idx()][pos as usize]
     }
 
-    fn get_earliest_trip(&self, route: RouteIdx, at: Tau, pos: u32) -> Option<TripIdx> {
+    fn get_earliest_trip(&self, route: RouteIdx, at: SecondOfDay, pos: u32) -> Option<TripIdx> {
         self.trips
             .iter()
             .enumerate()
@@ -241,12 +241,12 @@ where
             .map(|(trip_idx, _)| TripIdx::new(trip_idx as u32))
     }
 
-    fn get_arrival_time(&self, trip: TripIdx, pos: u32) -> Tau {
+    fn get_arrival_time(&self, trip: TripIdx, pos: u32) -> SecondOfDay {
         let (_route, times) = self.trips[trip.idx()].as_ref().expect("trip slot assigned");
         times[pos as usize].0
     }
 
-    fn get_departure_time(&self, trip: TripIdx, pos: u32) -> Tau {
+    fn get_departure_time(&self, trip: TripIdx, pos: u32) -> SecondOfDay {
         let (_route, times) = self.trips[trip.idx()].as_ref().expect("trip slot assigned");
         times[pos as usize].1
     }
@@ -298,7 +298,10 @@ where
             let color = COLORS[route_idx % COLORS.len()];
             let route_idx_typed = RouteIdx::new(route_idx as u32);
             #[allow(clippy::type_complexity)]
-            let route_trips: Vec<(usize, &(RouteIdx, Vec<(Tau, Tau)>))> = self
+            let route_trips: Vec<(
+                usize,
+                &(RouteIdx, Vec<(SecondOfDay, SecondOfDay)>),
+            )> = self
                 .trips
                 .iter()
                 .enumerate()

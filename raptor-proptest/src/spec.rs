@@ -81,14 +81,15 @@ pub fn render(spec: &NetworkSpec) -> SimpleTimetable<u8, u8, u16> {
             "leg_durations length mismatch",
         );
 
-        let mut trip_owned: Vec<(u16, Vec<(raptor::Tau, raptor::Tau)>)> =
+        let mut trip_owned: Vec<(u16, Vec<(raptor::SecondOfDay, raptor::SecondOfDay)>)> =
             Vec::with_capacity(route.trips.len());
         for trip in &route.trips {
             assert_eq!(trip.leg_durations.len(), stops.len() - 1);
             assert_eq!(trip.dwell_times.len(), stops.len());
 
-            let mut times: Vec<(raptor::Tau, raptor::Tau)> = Vec::with_capacity(stops.len());
-            let arr0 = raptor::Tau(trip.first_dep as u32);
+            let mut times: Vec<(raptor::SecondOfDay, raptor::SecondOfDay)> =
+                Vec::with_capacity(stops.len());
+            let arr0 = raptor::SecondOfDay(trip.first_dep as u32);
             let dep0 = arr0 + raptor::Duration(trip.dwell_times[0] as u32);
             times.push((arr0, dep0));
             for i in 1..stops.len() {
@@ -102,7 +103,7 @@ pub fn render(spec: &NetworkSpec) -> SimpleTimetable<u8, u8, u16> {
             next_trip_id = next_trip_id.checked_add(1).expect("trip id overflow");
         }
 
-        let trip_refs: Vec<(u16, &[(raptor::Tau, raptor::Tau)])> = trip_owned
+        let trip_refs: Vec<(u16, &[(raptor::SecondOfDay, raptor::SecondOfDay)])> = trip_owned
             .iter()
             .map(|(id, times)| (*id, times.as_slice()))
             .collect();
@@ -257,12 +258,12 @@ fn render_single_route_two_stops_one_trip() {
 
     // Position 0 of route r0 corresponds to stop 0; position 1 to stop 1.
     let trip = tt
-        .get_earliest_trip(r0, raptor::Tau::ZERO, 0)
+        .get_earliest_trip(r0, raptor::SecondOfDay::ZERO, 0)
         .expect("trip exists");
-    assert_eq!(tt.get_arrival_time(trip, 0), raptor::Tau(100));
-    assert_eq!(tt.get_departure_time(trip, 0), raptor::Tau(105));
-    assert_eq!(tt.get_arrival_time(trip, 1), raptor::Tau(125));
-    assert_eq!(tt.get_departure_time(trip, 1), raptor::Tau(125));
+    assert_eq!(tt.get_arrival_time(trip, 0), raptor::SecondOfDay(100));
+    assert_eq!(tt.get_departure_time(trip, 0), raptor::SecondOfDay(105));
+    assert_eq!(tt.get_arrival_time(trip, 1), raptor::SecondOfDay(125));
+    assert_eq!(tt.get_departure_time(trip, 1), raptor::SecondOfDay(125));
 }
 
 #[test]

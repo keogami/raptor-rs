@@ -14,11 +14,11 @@
 use gtfs_structures::Gtfs;
 use jiff::civil::date;
 use raptor::gtfs::GtfsTimetable;
-use raptor::{RaptorCache, Tau, Timetable};
+use raptor::{RaptorCache, SecondOfDay, Timetable};
 use std::path::Path;
 use std::time::Instant;
 
-const DEPARTURE_TIME: Tau = Tau(9 * 3600);
+const DEPARTURE_TIME: SecondOfDay = SecondOfDay(9 * 3600);
 const QUERY_REPEATS: usize = 50;
 
 struct FeedSpec {
@@ -224,7 +224,7 @@ fn main() -> anyhow::Result<()> {
 
             // Measure.
             let mut samples_ns: Vec<u128> = Vec::with_capacity(QUERY_REPEATS);
-            let mut last_arrival: Option<Tau> = None;
+            let mut last_arrival: Option<SecondOfDay> = None;
             let mut last_journey_count: usize = 0;
             for _ in 0..QUERY_REPEATS {
                 let t0 = Instant::now();
@@ -300,7 +300,7 @@ fn resolve_endpoint(
     }
 }
 
-fn format_hms(t: Tau) -> String {
+fn format_hms(t: SecondOfDay) -> String {
     let (h, m, s) = t.as_hms();
     format!("{h:02}:{m:02}:{s:02}")
 }

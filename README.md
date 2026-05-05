@@ -16,7 +16,7 @@ implements the `Timetable` trait for it. Most users start here.
 ```rust
 use gtfs_structures::Gtfs;
 use jiff::civil::date;
-use raptor::{Tau, Timetable};
+use raptor::{SecondOfDay, Timetable};
 use raptor::gtfs::GtfsTimetable;
 
 let gtfs = Gtfs::new("path/to/gtfs.zip")?;
@@ -33,7 +33,7 @@ let journeys = timetable
     .from(start)
     .to(target)
     .max_transfers(10u8)
-    .depart_at(Tau::hms(9, 0, 0))
+    .depart_at(SecondOfDay::hms(9, 0, 0))
     .run();
 
 for journey in &journeys {
@@ -51,7 +51,7 @@ A returned `Journey` has `plan: Vec<(RouteIdx, StopIdx)>` (each entry is
 "take this route, get off at this stop"), plus `origin` and `target` fields
 recording which user-supplied stops the algorithm picked, and a `label: L`
 that for the default single-criterion `ArrivalTime` carries the effective
-arrival time. Use `journey.arrival()` to read it as a `Tau` (seconds since
+arrival time. Use `journey.arrival()` to read it as a `SecondOfDay` (seconds since
 midnight, including the chosen target's walk-time offset). Each returned
 journey is Pareto-optimal: arrival strictly decreases as trip count
 increases, and no two returned journeys weakly dominate each other.
@@ -66,7 +66,7 @@ let journeys = timetable
     .from(timetable.station_stops("berlin_hbf"))   // 301 platforms
     .to(timetable.station_stops("berlin_alex"))    // 50 platforms
     .max_transfers(10u8)
-    .depart_at(Tau::hms(9, 0, 0))
+    .depart_at(SecondOfDay::hms(9, 0, 0))
     .run();
 ```
 
@@ -115,7 +115,7 @@ A `Journey<L>` has a `plan` and a `label`. The plan is a
 this stop". The source stop is implicit; it is not part of the plan. The
 `label: L` is the algorithm's per-stop label at the target; for the default
 single-criterion `ArrivalTime`, `journey.arrival()` (a method) returns the
-effective arrival time as a `Tau`.
+effective arrival time as a `SecondOfDay`.
 
 The plan records transit boardings only. If the optimal journey ends with a
 walk leg from the last boarded alight stop to the target, the plan still
@@ -126,7 +126,7 @@ target to detect this case.
 For custom labels (e.g. tracking accumulated walking time alongside arrival),
 see the `Label` trait and `Timetable::query_with_label::<L>()` (which mirrors
 `.query()` exactly but returns a `Query<..., L, ...>`). The single-criterion
-`ArrivalTime` impl is the default and inlines to plain `Tau` operations.
+`ArrivalTime` impl is the default and inlines to plain `SecondOfDay` operations.
 
 The `raptor::labels` module ships canned multi-criterion impls — currently
 `ArrivalAndWalk`, which returns a Pareto front of journeys trading off
@@ -157,13 +157,13 @@ For "leave between 17:00 and 18:00 — what are my options?" queries, swap the
 builder's `.depart_at(...)` for `.depart_in_window(...)`:
 
 ```rust,ignore
-use raptor::Tau;
+use raptor::SecondOfDay;
 let profile = tt
     .query()
     .from(start)
     .to(end)
     .max_transfers(10u8)
-    .depart_in_window((17 * 3600..18 * 3600).step_by(60).map(Tau::from_secs))
+    .depart_in_window((17 * 3600..18 * 3600).step_by(60).map(SecondOfDay::from_secs))
     .run();
 for entry in &profile {
     println!("leave at {}, arrive at {}", entry.depart, entry.journey.arrival());
@@ -192,7 +192,7 @@ many queries against the same timetable, allocate a `RaptorCache` once and
 finish each builder chain with `.run_with_cache(&mut cache)`:
 
 ```rust
-use raptor::{RaptorCache, Tau, Timetable};
+use raptor::{RaptorCache, SecondOfDay, Timetable};
 
 let mut cache = RaptorCache::for_timetable(&timetable);
 for q in queries {

@@ -8,7 +8,7 @@
 //! Custom impls live in user code — see the [`Label`](crate::Label)
 //! trait docs for the requirements.
 
-use crate::{Duration, Label, Tau};
+use crate::{Duration, Label, SecondOfDay};
 
 /// Two-criterion label tracking arrival time *and* accumulated walking
 /// time. Trip rides preserve the boarding label's walking time;
@@ -23,7 +23,7 @@ use crate::{Duration, Label, Tau};
 /// less.
 ///
 /// ```no_run
-/// use raptor::{Journey, StopIdx, Tau, Timetable};
+/// use raptor::{Journey, StopIdx, SecondOfDay, Timetable};
 /// use raptor::labels::ArrivalAndWalk;
 ///
 /// # fn run<T: Timetable>(tt: &T, start: StopIdx, target: StopIdx) {
@@ -32,7 +32,7 @@ use crate::{Duration, Label, Tau};
 ///     .from(start)
 ///     .to(target)
 ///     .max_transfers(10u8)
-///     .depart_at(Tau::hms(9, 0, 0))
+///     .depart_at(SecondOfDay::hms(9, 0, 0))
 ///     .run();
 /// for j in &journeys {
 ///     println!(
@@ -46,7 +46,7 @@ use crate::{Duration, Label, Tau};
 pub struct ArrivalAndWalk {
     /// Effective arrival time at the labelled stop, in seconds since
     /// midnight.
-    pub arrival: Tau,
+    pub arrival: SecondOfDay,
     /// Total walking time accumulated along the path that produced
     /// this label, in seconds.
     pub walk_time: Duration,
@@ -54,22 +54,22 @@ pub struct ArrivalAndWalk {
 
 impl Label for ArrivalAndWalk {
     const UNREACHED: Self = ArrivalAndWalk {
-        arrival: Tau::MAX,
+        arrival: SecondOfDay::MAX,
         walk_time: Duration::ZERO,
     };
 
     #[inline]
-    fn from_departure(tau: Tau) -> Self {
+    fn from_departure(at: SecondOfDay) -> Self {
         ArrivalAndWalk {
-            arrival: tau,
+            arrival: at,
             walk_time: Duration::ZERO,
         }
     }
 
     #[inline]
-    fn extend_by_trip(self, arrival_tau: Tau) -> Self {
+    fn extend_by_trip(self, arrival: SecondOfDay) -> Self {
         ArrivalAndWalk {
-            arrival: arrival_tau,
+            arrival,
             walk_time: self.walk_time,
         }
     }
@@ -88,7 +88,7 @@ impl Label for ArrivalAndWalk {
     }
 
     #[inline]
-    fn arrival(&self) -> Tau {
+    fn arrival(&self) -> SecondOfDay {
         self.arrival
     }
 }

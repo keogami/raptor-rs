@@ -51,7 +51,7 @@ pub fn raptor_front(journeys: &[Journey]) -> BTreeSet<(u16, u8)> {
 }
 
 #[cfg(test)]
-use raptor::{Duration, Tau, Timetable};
+use raptor::{Duration, SecondOfDay, Timetable};
 
 #[cfg(test)]
 fn run_property(tc: &hegel::TestCase, spec: &spec::NetworkSpec) {
@@ -63,7 +63,7 @@ fn run_property(tc: &hegel::TestCase, spec: &spec::NetworkSpec) {
         .from(&[(ps_idx, Duration::ZERO)])
         .to(&[(pt_idx, Duration::ZERO)])
         .max_transfers(spec.query.max_transfers as usize as u8)
-        .depart_at(Tau(spec.query.tau as u32))
+        .depart_at(SecondOfDay(spec.query.tau as u32))
         .run();
     let theirs = reference::reference_solve(
         spec,
@@ -113,7 +113,7 @@ mod tests {
                 .into_iter()
                 .map(|(r, s)| (RouteIdx::new(r), StopIdx::new(s)))
                 .collect(),
-            label: ArrivalTime(Tau(arrival)),
+            label: ArrivalTime(SecondOfDay(arrival)),
         }
     }
 

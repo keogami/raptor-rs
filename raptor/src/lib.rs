@@ -13,7 +13,7 @@
 //! ```no_run
 //! use gtfs_structures::Gtfs;
 //! use jiff::civil::date;
-//! use raptor::{Tau, Timetable};
+//! use raptor::{SecondOfDay, Timetable};
 //! use raptor::gtfs::GtfsTimetable;
 //!
 //! # fn main() -> anyhow::Result<()> {
@@ -31,7 +31,7 @@
 //!     .from(start)
 //!     .to(target)
 //!     .max_transfers(10u8)
-//!     .depart_at(Tau::hms(9, 0, 0))
+//!     .depart_at(SecondOfDay::hms(9, 0, 0))
 //!     .run();
 //!
 //! for journey in &journeys {
@@ -98,33 +98,33 @@ pub(crate) type K = usize;
 /// service date. Wraps a `u32` — the day is 86,400 seconds; `u32`
 /// covers feed quirks like trips encoded past 24h with room to spare.
 ///
-/// Tau is a *timestamp*. A *length* of time — walk-time offset,
+/// SecondOfDay is a *timestamp*. A *length* of time — walk-time offset,
 /// transfer time, dwell time — is a [`Duration`], a distinct type.
 /// The trait surface uses both consistently so they can't be
 /// silently confused.
 ///
-/// Construct via [`Tau::ZERO`], [`Tau::from_secs`], [`Tau::hms`], or
-/// the public-field constructor `Tau(n)`. Extract via
-/// [`Tau::as_secs`] / [`Tau::as_hms`]. Arithmetic with [`Duration`]
-/// is saturating: `Tau::MAX + Duration::MAX` stays at `Tau::MAX`.
+/// Construct via [`SecondOfDay::ZERO`], [`SecondOfDay::from_secs`], [`SecondOfDay::hms`], or
+/// the public-field constructor `SecondOfDay(n)`. Extract via
+/// [`SecondOfDay::as_secs`] / [`SecondOfDay::as_hms`]. Arithmetic with [`Duration`]
+/// is saturating: `SecondOfDay::MAX + Duration::MAX` stays at `SecondOfDay::MAX`.
 #[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Default)]
-pub struct Tau(pub u32);
+pub struct SecondOfDay(pub u32);
 
-impl Tau {
+impl SecondOfDay {
     /// Midnight (0 seconds since the start of the service day).
-    pub const ZERO: Tau = Tau(0);
+    pub const ZERO: SecondOfDay = SecondOfDay(0);
     /// Sentinel for "unreached". The algorithm uses this internally
     /// for empty `(round, stop)` cells.
-    pub const MAX: Tau = Tau(u32::MAX);
+    pub const MAX: SecondOfDay = SecondOfDay(u32::MAX);
 
     /// Construct from a raw seconds-since-midnight count.
     pub const fn from_secs(s: u32) -> Self {
-        Tau(s)
+        SecondOfDay(s)
     }
 
     /// Construct from `(hours, minutes, seconds)`.
     pub const fn hms(h: u32, m: u32, s: u32) -> Self {
-        Tau(h * 3600 + m * 60 + s)
+        SecondOfDay(h * 3600 + m * 60 + s)
     }
 
     /// The underlying `u32` — seconds since midnight.
@@ -138,49 +138,49 @@ impl Tau {
     }
 }
 
-impl From<u32> for Tau {
+impl From<u32> for SecondOfDay {
     fn from(s: u32) -> Self {
-        Tau(s)
+        SecondOfDay(s)
     }
 }
 
-impl fmt::Display for Tau {
+impl fmt::Display for SecondOfDay {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         self.0.fmt(f)
     }
 }
 
-impl std::ops::Add<Duration> for Tau {
-    /// `Tau + Duration` advances the timestamp; saturating on overflow.
-    type Output = Tau;
-    fn add(self, d: Duration) -> Tau {
-        Tau(self.0.saturating_add(d.0))
+impl std::ops::Add<Duration> for SecondOfDay {
+    /// `SecondOfDay + Duration` advances the timestamp; saturating on overflow.
+    type Output = SecondOfDay;
+    fn add(self, d: Duration) -> SecondOfDay {
+        SecondOfDay(self.0.saturating_add(d.0))
     }
 }
 
-impl std::ops::Sub<Tau> for Tau {
-    /// `Tau - Tau` is the [`Duration`] between them, saturating at
+impl std::ops::Sub<SecondOfDay> for SecondOfDay {
+    /// `SecondOfDay - SecondOfDay` is the [`Duration`] between them, saturating at
     /// [`Duration::ZERO`] if `self < other`.
     type Output = Duration;
-    fn sub(self, other: Tau) -> Duration {
+    fn sub(self, other: SecondOfDay) -> Duration {
         Duration(self.0.saturating_sub(other.0))
     }
 }
 
-impl std::ops::Sub<Duration> for Tau {
-    /// `Tau - Duration` rewinds the timestamp; saturating at
-    /// [`Tau::ZERO`] on underflow.
-    type Output = Tau;
-    fn sub(self, d: Duration) -> Tau {
-        Tau(self.0.saturating_sub(d.0))
+impl std::ops::Sub<Duration> for SecondOfDay {
+    /// `SecondOfDay - Duration` rewinds the timestamp; saturating at
+    /// [`SecondOfDay::ZERO`] on underflow.
+    type Output = SecondOfDay;
+    fn sub(self, d: Duration) -> SecondOfDay {
+        SecondOfDay(self.0.saturating_sub(d.0))
     }
 }
 
-/// A length of time, in seconds. Distinct from [`Tau`] (a point in
+/// A length of time, in seconds. Distinct from [`SecondOfDay`] (a point in
 /// time) so the algorithm signatures can express which kind they
 /// expect: a walk-time offset, a transfer time, and a dwell time
 /// are all `Duration`; an arrival time and a departure time are
-/// both `Tau`.
+/// both `SecondOfDay`.
 ///
 /// Constructed via [`Duration::ZERO`], [`Duration::from_secs`], or
 /// the public-field constructor `Duration(n)`. Arithmetic is
@@ -549,14 +549,14 @@ pub trait Label: Copy + std::fmt::Debug {
     /// `(round, stop)` cell to this value before seeding origins.
     const UNREACHED: Self;
 
-    /// Initial label at an origin stop departing at time `tau`.
-    fn from_departure(tau: Tau) -> Self;
+    /// Initial label at an origin stop, given the user's departure time.
+    fn from_departure(at: SecondOfDay) -> Self;
 
     /// New label produced by alighting from a trip at this stop with
-    /// arrival time `arrival_tau`. `self` is the label at the boarding
+    /// the given arrival time. `self` is the label at the boarding
     /// stop. For multi-criterion impls, components like accumulated
     /// walking time inherit from `self`.
-    fn extend_by_trip(self, arrival_tau: Tau) -> Self;
+    fn extend_by_trip(self, arrival: SecondOfDay) -> Self;
 
     /// New label after walking a footpath of duration `walk_time`.
     fn extend_by_footpath(self, walk_time: Duration) -> Self;
@@ -571,27 +571,27 @@ pub trait Label: Copy + std::fmt::Debug {
 
     /// Effective arrival time at the labelled stop. Used by the
     /// algorithm for target-threshold comparisons and by [`Journey`]
-    /// output. Always returns [`Tau::MAX`] for [`Label::UNREACHED`].
-    fn arrival(&self) -> Tau;
+    /// output. Always returns [`SecondOfDay::MAX`] for [`Label::UNREACHED`].
+    fn arrival(&self) -> SecondOfDay;
 }
 
 /// Single-criterion label = arrival time at a stop. Default `L`
-/// throughout the algorithm. Constructing from a `Tau` is direct;
+/// throughout the algorithm. Constructing from a `SecondOfDay` is direct;
 /// extracting back is `arrival()`.
 #[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub struct ArrivalTime(pub Tau);
+pub struct ArrivalTime(pub SecondOfDay);
 
 impl Label for ArrivalTime {
-    const UNREACHED: Self = ArrivalTime(Tau::MAX);
+    const UNREACHED: Self = ArrivalTime(SecondOfDay::MAX);
 
     #[inline]
-    fn from_departure(tau: Tau) -> Self {
-        ArrivalTime(tau)
+    fn from_departure(at: SecondOfDay) -> Self {
+        ArrivalTime(at)
     }
 
     #[inline]
-    fn extend_by_trip(self, arrival_tau: Tau) -> Self {
-        ArrivalTime(arrival_tau)
+    fn extend_by_trip(self, arrival: SecondOfDay) -> Self {
+        ArrivalTime(arrival)
     }
 
     #[inline]
@@ -600,7 +600,7 @@ impl Label for ArrivalTime {
     }
 
     #[inline]
-    fn arrival(&self) -> Tau {
+    fn arrival(&self) -> SecondOfDay {
         self.0
     }
 }
@@ -643,13 +643,13 @@ impl<L: Label> Journey<L> {
     /// Convenience accessor: `self.label.arrival()`. The effective
     /// arrival time at the chosen target, with the target's
     /// walk-time offset already applied.
-    pub fn arrival(&self) -> Tau {
+    pub fn arrival(&self) -> SecondOfDay {
         self.label.arrival()
     }
 
     /// Walk the plan against `tt` to recover the specific trip ridden
     /// for each leg, plus per-leg departure and arrival times.
-    /// `tau` is the original query departure time and `origin_walk`
+    /// `depart` is the original query departure time and `origin_walk`
     /// is the walk-time offset for `self.origin` from the original
     /// origins slice (typically 0 for single-stop queries).
     ///
@@ -674,7 +674,7 @@ impl<L: Label> Journey<L> {
     ///   per-call walk-graph relaxation; neither is shipped today.
     ///
     /// In practice the first two should not happen for a `Journey`
-    /// produced by the same `tt` and `tau` — they're soundness
+    /// produced by the same `tt` and `depart` — they're soundness
     /// escape hatches.
     ///
     /// **Loop routes:** if `route` revisits the boarding stop on
@@ -686,11 +686,11 @@ impl<L: Label> Journey<L> {
     pub fn with_timing<T: Timetable>(
         &self,
         tt: &T,
-        tau: Tau,
+        depart: SecondOfDay,
         origin_walk: Duration,
     ) -> Option<Vec<TimedLeg>> {
         let mut legs = Vec::with_capacity(self.plan.len());
-        let mut current_time = tau + origin_walk;
+        let mut current_time = depart + origin_walk;
         let mut current_stop = self.origin;
 
         for &(route, alight) in &self.plan {
@@ -762,9 +762,9 @@ pub struct TimedLeg {
     /// after the rider's available time at `board`.
     pub trip: TripIdx,
     /// Departure time at `board`, in seconds since midnight.
-    pub depart: Tau,
+    pub depart: SecondOfDay,
     /// Arrival time at `alight`, in seconds since midnight.
-    pub arrive: Tau,
+    pub arrive: SecondOfDay,
 }
 
 /// One reconstructable step in a journey: either a transit boarding event
@@ -784,18 +784,18 @@ enum Step {
     Boarded {
         from: StopIdx,
         route: RouteIdx,
-        parent_arrival: Tau,
+        parent_arrival: SecondOfDay,
     },
     Walked {
         from: StopIdx,
-        parent_arrival: Tau,
+        parent_arrival: SecondOfDay,
     },
 }
 
 /// Boarding tree key: `(round, stop, label_arrival)`. The third
 /// component disambiguates Pareto-optimal labels with distinct
 /// arrival times in the same `(round, stop)` bag.
-type BoardingTree = BTreeMap<(K, StopIdx, Tau), Step>;
+type BoardingTree = BTreeMap<(K, StopIdx, SecondOfDay), Step>;
 
 /// A Pareto front of [`Label`]s at a single `(round, stop)` cell.
 /// Backed by `SmallVec<[L; 8]>` — for single-criterion `ArrivalTime`
@@ -835,13 +835,13 @@ impl<L: Label> LabelBag<L> {
         true
     }
 
-    /// Minimum `arrival()` across the bag, or `Tau::MAX` if empty.
-    fn min_arrival(&self) -> Tau {
+    /// Minimum `arrival()` across the bag, or `SecondOfDay::MAX` if empty.
+    fn min_arrival(&self) -> SecondOfDay {
         self.items
             .iter()
             .map(|l| l.arrival())
             .min()
-            .unwrap_or(Tau::MAX)
+            .unwrap_or(SecondOfDay::MAX)
     }
 
     fn clear(&mut self) {
@@ -890,7 +890,7 @@ fn insert_into_bag<L: Label>(
     board_detail: &mut BoardingTree,
     out: &mut Vec<StopIdx>,
     ever_reached: &mut FixedBitSet,
-    pt_threshold: Tau,
+    pt_threshold: SecondOfDay,
     k: K,
     stop: StopIdx,
     label: L,
@@ -917,7 +917,7 @@ fn relax_footpaths_round_closed<T: Timetable + ?Sized, L: Label>(
     best_arrival: &mut [LabelBag<L>],
     board_detail: &mut BoardingTree,
     sources: &FixedBitSet,
-    pt_threshold: Tau,
+    pt_threshold: SecondOfDay,
     out: &mut Vec<StopIdx>,
     ever_reached: &mut FixedBitSet,
 ) {
@@ -967,9 +967,9 @@ fn relax_footpaths_round<T: Timetable + ?Sized, L: Label>(
     best_arrival: &mut [LabelBag<L>],
     board_detail: &mut BoardingTree,
     sources: &FixedBitSet,
-    pt_threshold: Tau,
+    pt_threshold: SecondOfDay,
     out: &mut Vec<StopIdx>,
-    heap: &mut BinaryHeap<Reverse<(Tau, u32)>>,
+    heap: &mut BinaryHeap<Reverse<(SecondOfDay, u32)>>,
     ever_reached: &mut FixedBitSet,
 ) {
     // Multi-source Dijkstra over the footpath graph at round `k`,
@@ -986,7 +986,7 @@ fn relax_footpaths_round<T: Timetable + ?Sized, L: Label>(
     heap.clear();
     for bit in sources.ones() {
         let min_arr = labels[k][bit].min_arrival();
-        if min_arr != Tau::MAX {
+        if min_arr != SecondOfDay::MAX {
             heap.push(Reverse((min_arr, bit as u32)));
         }
     }
@@ -1037,16 +1037,16 @@ fn relax_footpaths_round<T: Timetable + ?Sized, L: Label>(
 
 /// Returns the minimum of `best_arrival[t].min_arrival() + w` across
 /// all `(t, w)` in `targets`, saturating on overflow. Returns
-/// `Tau::MAX` if every target is unreached.
+/// `SecondOfDay::MAX` if every target is unreached.
 fn best_to_any_target<L: Label>(
     best_arrival: &[LabelBag<L>],
     targets: &[(StopIdx, Duration)],
-) -> Tau {
+) -> SecondOfDay {
     targets
         .iter()
         .map(|&(t, w)| best_arrival[t.idx()].min_arrival() + w)
         .min()
-        .unwrap_or(Tau::MAX)
+        .unwrap_or(SecondOfDay::MAX)
 }
 
 /// Reconstruct a single candidate plan terminating at the target
@@ -1059,7 +1059,7 @@ fn reconstruct_journey(
     tree: &BoardingTree,
     origins: &FixedBitSet,
     pt: StopIdx,
-    target_arrival: Tau,
+    target_arrival: SecondOfDay,
     k: K,
 ) -> Option<(StopIdx, Vec<(RouteIdx, StopIdx)>)> {
     if tree.is_empty() {
@@ -1181,15 +1181,15 @@ pub trait Timetable {
     ///
     /// `pos` disambiguates which visit of the stop to consider when the route
     /// revisits it. Returns `None` if no trip departs at or after `at`.
-    fn get_earliest_trip(&self, route: RouteIdx, at: Tau, pos: u32) -> Option<TripIdx>;
+    fn get_earliest_trip(&self, route: RouteIdx, at: SecondOfDay, pos: u32) -> Option<TripIdx>;
 
     /// Returns the arrival time of a trip at the given position within its
     /// route's sequence.
-    fn get_arrival_time(&self, trip: TripIdx, pos: u32) -> Tau;
+    fn get_arrival_time(&self, trip: TripIdx, pos: u32) -> SecondOfDay;
 
     /// Returns the departure time of a trip at the given position within its
     /// route's sequence.
-    fn get_departure_time(&self, trip: TripIdx, pos: u32) -> Tau;
+    fn get_departure_time(&self, trip: TripIdx, pos: u32) -> SecondOfDay;
 
     /// Returns all stops directly reachable from the given stop via
     /// walking (footpaths).
@@ -1223,16 +1223,6 @@ pub trait Timetable {
         false
     }
 
-    /// Runs the RAPTOR algorithm and returns all Pareto-optimal journeys
-    /// from any of the `origins` to any of the `targets`.
-    ///
-    /// Each `(stop, walk)` entry in `origins` says "the user can reach
-    /// this stop at time `tau + walk`". Each entry in `targets` says
-    /// "reaching this stop is worth `walk` more seconds of walking to
-    /// arrive at the user's actual destination". The algorithm minimises
-    /// effective arrival = `arrival_at_target_stop + walk_time`.
-    ///
-    /// For a single-stop query, pass `&[(stop, 0)]`. For a station with
     /// Start a typestate-builder query. Returns a [`Query`] in the
     /// [`NeedsDeparture`] state. Call `.from(...).to(...).max_transfers(...)`
     /// (any order, all optional with defaults), then either
@@ -1240,14 +1230,14 @@ pub trait Timetable {
     /// `.depart_in_window(...)` for a range query, then `.run()`.
     ///
     /// ```no_run
-    /// # use raptor::{Timetable, Tau, Duration, StopIdx};
+    /// # use raptor::{Timetable, SecondOfDay, Duration, StopIdx};
     /// # fn ex<T: Timetable>(tt: &T, start: StopIdx, end: StopIdx) {
     /// let journeys = tt
     ///     .query()
     ///     .from(start)
     ///     .to(end)
     ///     .max_transfers(10u8)
-    ///     .depart_at(Tau::hms(9, 0, 0))
+    ///     .depart_at(SecondOfDay::hms(9, 0, 0))
     ///     .run();
     /// # }
     /// ```
@@ -1291,7 +1281,7 @@ pub trait Timetable {
         &self,
         cache: &mut RaptorCache<L>,
         transfers: usize,
-        tau: Tau,
+        depart: SecondOfDay,
         origins: impl IntoEndpoints,
         targets: impl IntoEndpoints,
     ) -> Vec<Journey<L>>
@@ -1323,11 +1313,11 @@ pub trait Timetable {
             origin_set.insert(o.idx());
         }
 
-        // Seed labels for each origin at tau + its walk-time offset.
+        // Seed labels for each origin at depart + its walk-time offset.
         // Reconstruction breaks the trace loop when it hits an origin
         // (origin_set bit is set), so origins don't need a Step entry.
         for &(o, walk) in origins {
-            let t = tau + walk;
+            let t = depart + walk;
             let seed = L::from_departure(t);
             if labels[0][o.idx()].insert(seed) {
                 best_arrival[o.idx()].insert(seed);
@@ -1546,7 +1536,7 @@ pub trait Timetable {
                     labels[k][target.idx()].iter().copied().collect();
                 for raw_label in &bag_snapshot {
                     let raw_arr = raw_label.arrival();
-                    if raw_arr == Tau::MAX {
+                    if raw_arr == SecondOfDay::MAX {
                         continue;
                     }
                     let Some((origin, plan)) =
@@ -1605,7 +1595,7 @@ pub trait Timetable {
         &self,
         cache: &mut RaptorCache<L>,
         transfers: usize,
-        departures: impl IntoIterator<Item = Tau>,
+        departures: impl IntoIterator<Item = SecondOfDay>,
         origins: impl IntoEndpoints,
         targets: impl IntoEndpoints,
     ) -> Vec<RangeJourney<L>>
@@ -1664,7 +1654,7 @@ pub trait Timetable {
 pub struct RangeJourney<L: Label = ArrivalTime> {
     /// The departure time this journey assumes — the user leaves the
     /// origin (or starts the origin walk) at this time.
-    pub depart: Tau,
+    pub depart: SecondOfDay,
     /// The journey itself, as if `depart` had been passed to
     /// [`Timetable::raptor`] directly.
     pub journey: Journey<L>,
@@ -1683,15 +1673,15 @@ pub struct NeedsDeparture;
 /// `Vec<Journey<L>>`.
 #[derive(Debug, Clone, Copy)]
 pub struct SingleDeparture {
-    tau: Tau,
+    at: SecondOfDay,
 }
 
 /// Marker type: a range-query `Query` over a window of departure
-/// times (collected eagerly into a `Vec<Tau>` at builder time).
+/// times (collected eagerly into a `Vec<SecondOfDay>` at builder time).
 /// `.run()` returns `Vec<RangeJourney<L>>`.
 #[derive(Debug, Clone)]
 pub struct RangeDeparture {
-    departures: Vec<Tau>,
+    departures: Vec<SecondOfDay>,
 }
 
 /// Builder for a RAPTOR query. Constructed via [`Timetable::query`].
@@ -1758,23 +1748,23 @@ where
 
     /// Configure a single-departure query. After this call, `.run()`
     /// returns `Vec<Journey<L>>`.
-    pub fn depart_at(self, t: impl Into<Tau>) -> Query<'tt, T, L, SingleDeparture> {
+    pub fn depart_at(self, t: impl Into<SecondOfDay>) -> Query<'tt, T, L, SingleDeparture> {
         Query {
             tt: self.tt,
             origins: self.origins,
             targets: self.targets,
             max_transfers: self.max_transfers,
-            mode: SingleDeparture { tau: t.into() },
+            mode: SingleDeparture { at: t.into() },
             _label: std::marker::PhantomData,
         }
     }
 
     /// Configure a range query over the supplied departure times.
-    /// Collected eagerly into a `Vec<Tau>` at builder time. After
+    /// Collected eagerly into a `Vec<SecondOfDay>` at builder time. After
     /// this call, `.run()` returns `Vec<RangeJourney<L>>`.
     pub fn depart_in_window(
         self,
-        deps: impl IntoIterator<Item = Tau>,
+        deps: impl IntoIterator<Item = SecondOfDay>,
     ) -> Query<'tt, T, L, RangeDeparture> {
         Query {
             tt: self.tt,
@@ -1809,7 +1799,7 @@ where
         self.tt.raptor_with_cache_and_label(
             cache,
             self.max_transfers.0 as usize,
-            self.mode.tau,
+            self.mode.at,
             self.origins,
             self.targets,
         )
@@ -1883,7 +1873,7 @@ pub struct RaptorCache<L: Label = ArrivalTime> {
 
     /// Min-heap reused across footpath relaxations. Entries are
     /// `(arrival_time, stop_bit)`; lazy deletion via the time field.
-    relax_heap: BinaryHeap<Reverse<(Tau, u32)>>,
+    relax_heap: BinaryHeap<Reverse<(SecondOfDay, u32)>>,
 
     /// Bitset of stops with a non-empty bag in any round seen so
     /// far this query. Used to make per-round carry-forward sparse:

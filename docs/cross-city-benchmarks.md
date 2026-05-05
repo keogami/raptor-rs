@@ -132,7 +132,7 @@ serve. v0.6 and earlier only accepted a single `StopIdx` per query, so
 asking with a parent-station ID returned nothing because no route
 serves the parent directly.
 
-v0.7 generalises the query to `&[(StopIdx, Tau)]` for both origins and
+v0.7 generalises the query to `&[(StopIdx, SecondOfDay)]` for both origins and
 targets, and adds `GtfsTimetable::station_stops(parent_id)` returning
 the parent's child platforms ready to pass straight to `raptor`. The
 algorithm picks the best origin/target combination internally.
