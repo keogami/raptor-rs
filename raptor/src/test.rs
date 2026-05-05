@@ -937,6 +937,66 @@ fn multi_target_walk_offset_picks_best_target() {
 }
 
 #[test]
+fn into_endpoints_accepts_natural_input_shapes() {
+    // The single-stop call is the headline ergonomics win — `start` and
+    // `end` go straight in, no slice-of-tuples wrapping.
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+    enum S {
+        A,
+        B,
+        C,
+    }
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+    enum R {
+        R1,
+    }
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+    enum Tr {
+        T1,
+    }
+
+    let tt = SimpleTimetable::new().route(
+        R::R1,
+        &[S::A, S::B, S::C],
+        &[(Tr::T1, &[(0, 0), (10, 10), (20, 20)])],
+    );
+    let a = tt.stop_idx_of(&S::A);
+    let b = tt.stop_idx_of(&S::B);
+    let c = tt.stop_idx_of(&S::C);
+
+    // 1. Bare StopIdx — the trivial case.
+    let j = tt.raptor(3, 0, a, c);
+    assert_eq!(j.len(), 1);
+    assert_eq!(j[0].arrival(), 20);
+
+    // 2. (StopIdx, Duration) pair as a single endpoint with explicit walk.
+    //    Walk-time offset of 0 should match the bare-stop behaviour above.
+    let j = tt.raptor(3, 0, (a, Duration::ZERO), c);
+    assert_eq!(j[0].arrival(), 20);
+
+    // 3. Slice of stops (multi-source / multi-target with walk = 0).
+    let stops = [a, b];
+    let j = tt.raptor(3, 0, &stops[..], c);
+    assert_eq!(j[0].arrival(), 20);
+
+    // 4. Slice of (stop, duration) pairs — original v0.13 shape.
+    let pairs = [(a, Duration::ZERO)];
+    let j = tt.raptor(3, 0, &pairs[..], &[(c, Duration::ZERO)][..]);
+    assert_eq!(j[0].arrival(), 20);
+
+    // 5. Owned Vec of (stop, duration) pairs.
+    let owned = vec![(a, Duration::ZERO)];
+    let j = tt.raptor(3, 0, &owned, c);
+    assert_eq!(j[0].arrival(), 20);
+
+    // 6. Pre-built Endpoints.
+    let mut ep = crate::Endpoints::new();
+    ep.push(a, Duration::ZERO);
+    let j = tt.raptor(3, 0, ep, c);
+    assert_eq!(j[0].arrival(), 20);
+}
+
+#[test]
 fn closed_path_dispatch_matches_dijkstra() {
     use crate::{RouteIdx, StopIdx, Tau, TripIdx};
 
