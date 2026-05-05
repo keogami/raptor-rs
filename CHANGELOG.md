@@ -21,8 +21,6 @@ parallel batch behind a new default-on `parallel` feature flag.
   — same parallelism, caller-supplied pool. Available with the
   `parallel` feature.
 
-The serial `.run()` / `.run_with_cache(&mut cache)` paths are unchanged.
-
 ### Performance
 
 60-departure window on the bundled Delhi feed (Apple Silicon, 8 cores):
