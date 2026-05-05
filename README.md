@@ -144,6 +144,25 @@ for leg in journey.with_timing(&tt, tau, 0).unwrap() {
 Walking transfers between consecutive transit legs are implicit (the gap in
 timestamps reflects the walk). See `TimedLeg`'s docs for details.
 
+### Range queries
+
+For "leave between 17:00 and 18:00 — what are my options?" queries, use
+`Timetable::raptor_range`:
+
+```rust,ignore
+let profile = tt.raptor_range(10, (17 * 3600..18 * 3600).step_by(60), &origins, &targets);
+for entry in &profile {
+    println!("leave at {}s, arrive at {}s", entry.depart, entry.journey.arrival());
+}
+```
+
+The returned `Vec<RangeJourney>` is Pareto-optimal on
+`(later depart, fewer transfers, dominated label)` — duplicates and
+strictly-worse alternatives are dropped automatically. See `RangeJourney`'s
+docs for the exact contract. The current implementation is a naïve batch
+(one call per departure with shared `RaptorCache`); a proper rRAPTOR
+algorithm rewrite is queued for a future release with the same output shape.
+
 To translate index newtypes back to your adapter's external IDs, the bundled
 GTFS adapter exposes `GtfsTimetable::stop_id(stop_idx)` and
 `GtfsTimetable::route_id(route_idx)`. The synthetic-route splitting (one GTFS

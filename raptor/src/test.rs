@@ -1043,6 +1043,57 @@ fn arrival_and_walk_label_tracks_accumulated_walk_time() {
 }
 
 #[test]
+fn raptor_range_returns_pareto_profile_across_departures() {
+    // R1 has three departures: T1 (0->10), T2 (10->20), T3 (20->30).
+    // Querying departures [0, 5, 10, 15, 20]:
+    // - depart=0  catches T1, arr=10
+    // - depart=5  catches T2, arr=20 (no choice but to wait)
+    // - depart=10 catches T2, arr=20 — strictly better than depart=5
+    //   (later departure, same arrival) → depart=5 dominated, dropped.
+    // - depart=15 catches T3, arr=30 (must wait)
+    // - depart=20 catches T3, arr=30 — better than depart=15, drop it.
+    // Profile: [(0, arr 10), (10, arr 20), (20, arr 30)].
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+    enum S {
+        A,
+        B,
+    }
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+    enum R {
+        R1,
+    }
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+    enum Tr {
+        T1,
+        T2,
+        T3,
+    }
+
+    let tt = SimpleTimetable::new().route(
+        R::R1,
+        &[S::A, S::B],
+        &[
+            (Tr::T1, &[(0, 0), (10, 10)]),
+            (Tr::T2, &[(10, 10), (20, 20)]),
+            (Tr::T3, &[(20, 20), (30, 30)]),
+        ],
+    );
+
+    let a = tt.stop_idx_of(&S::A);
+    let b = tt.stop_idx_of(&S::B);
+
+    let profile = tt.raptor_range(3, [0, 5, 10, 15, 20], &[(a, 0)], &[(b, 0)]);
+
+    let mut points: Vec<(crate::Tau, crate::Tau)> = profile
+        .iter()
+        .map(|p| (p.depart, p.journey.arrival()))
+        .collect();
+    points.sort();
+
+    assert_eq!(points, vec![(0, 10), (10, 20), (20, 30)]);
+}
+
+#[test]
 fn arrival_and_walk_returns_pareto_front() {
     // Two routes reach two intermediate stops; both stops walk to the
     // target with different walk times. Path via X is faster but with

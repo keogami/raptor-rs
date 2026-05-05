@@ -1,5 +1,56 @@
 # Changelog
 
+## [0.13.1] — 2026-05-05
+
+Naïve batch range query API. Lands the user-facing range-query
+feature (Phase 3.1) ahead of the planned API ergonomics pass and the
+real rRAPTOR algorithm rewrite. The output shape is the one the
+proper rRAPTOR will produce, so callers writing against this API
+today won't have to migrate.
+
+### Added
+
+- `Timetable::raptor_range(transfers, departures, origins, targets)
+  -> Vec<RangeJourney>` — for each `Tau` in `departures` (any
+  `IntoIterator`), runs the algorithm and Pareto-filters the
+  combined results into a profile. Common pattern:
+  `tt.raptor_range(10, (t_start..t_end).step_by(60), &origins,
+  &targets)` for one query per minute over a window.
+- `Timetable::raptor_range_with_cache::<L>(cache, …)` — generic
+  variant taking a `RaptorCache<L>`. The label parameter is
+  inferred from `cache`. For server workloads.
+- `pub struct RangeJourney<L: Label = ArrivalTime> { depart, journey }`
+  — one entry per Pareto-optimal `(depart, journey)` pair.
+
+### Pareto contract
+
+The returned profile is Pareto-optimal on the triple
+`(later depart, fewer transfers, dominated label)` — concretely,
+for any two returned entries, neither has all of `(depart ≥,
+plan.len ≤, label.dominates)` holding. So a caller can read the
+result as a true profile: each entry is either strictly better
+than every other on at least one axis, or incomparable.
+
+### Implementation note
+
+This is a naïve batch — each departure is a fresh
+`raptor_with_cache` call with no cross-departure state sharing.
+The proper rRAPTOR algorithm processes events in reverse
+chronological order and reuses labels, dropping the per-call
+overhead. Roadmap §3.1 has the details; that lands after the
+API ergonomics pass so the new public surface uses the new
+shape.
+
+### Tests
+
+- `raptor_range_returns_pareto_profile_across_departures`:
+  three-trip route with departures `[0, 5, 10, 15, 20]`
+  produces profile `[(0, arr 10), (10, arr 20), (20, arr 30)]`
+  — the intermediate `(5, arr 20)` and `(15, arr 30)` entries
+  are correctly dropped as Pareto-dominated by their
+  later-departure counterparts. 55/55 tests + proptests +
+  doctests green.
+
 ## [0.13.0] — 2026-05-05
 
 Canned multi-criterion `Label` impl + label-aware journey output.

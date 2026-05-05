@@ -396,8 +396,17 @@ Most users don't actually want "best journey departing at exactly
 window". rRAPTOR (described in §4 of the paper) does this efficiently
 by sharing work across departure times.
 
-This needs a separate algorithm path; can't be retrofitted onto plain
-RAPTOR. Worth doing because every routing UI eventually wants it.
+**Status (v0.13.1):** the user-facing API has landed in naïve batch
+form — `Timetable::raptor_range(transfers, departures, origins,
+targets) -> Vec<RangeJourney>`. Implementation just loops over the
+caller-supplied departures, sharing only the `RaptorCache`. Output
+is Pareto-filtered to a true profile, so callers writing against
+this API today won't have to migrate when the proper algorithm
+rewrite lands.
+
+The proper rRAPTOR algorithm (single reverse-chronological scan
+that reuses labels across departure events) is queued for a future
+release after the planned API ergonomics pass.
 
 ### 3.2 GTFS-RT (real-time updates)
 

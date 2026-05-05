@@ -1262,6 +1262,111 @@ pub trait Timetable {
         }
         front
     }
+
+    /// Range query — runs [`Timetable::raptor`] for each departure
+    /// time in `departures` and returns a Pareto profile of
+    /// `(depart, journey)` pairs across the whole window.
+    ///
+    /// **Status (v0.13):** naïve batch implementation — calls the
+    /// per-departure algorithm once per `departures` entry, sharing
+    /// only the `RaptorCache`. The full rRAPTOR algorithm (one
+    /// reverse-chronological scan that shares state across departure
+    /// events) is queued for v0.14+. Output shape is intentionally
+    /// the one rRAPTOR will produce, so callers writing against this
+    /// API today won't have to migrate.
+    ///
+    /// `departures` is `IntoIterator<Item = Tau>` — pass any range,
+    /// `Vec<Tau>`, or other iterator. Common pattern:
+    /// `(t_start..t_end).step_by(60)` for one query per minute.
+    ///
+    /// The returned [`RangeJourney`]s are Pareto-optimal on the
+    /// triple `(later departure, fewer transfers, dominated label)`.
+    /// Concretely: for any two returned entries, neither has all of
+    /// (departure ≥, plan.len ≤, label.dominates) holding — so a
+    /// caller can read the result as a true profile.
+    fn raptor_range(
+        &self,
+        transfers: usize,
+        departures: impl IntoIterator<Item = Tau>,
+        origins: &[(StopIdx, Tau)],
+        targets: &[(StopIdx, Tau)],
+    ) -> Vec<RangeJourney>
+    where
+        Self: Sized,
+    {
+        let mut cache = RaptorCache::<ArrivalTime>::for_timetable(self);
+        self.raptor_range_with_cache(&mut cache, transfers, departures, origins, targets)
+    }
+
+    /// Same as [`Timetable::raptor_range`] but reuses scratch buffers
+    /// from `cache` across every per-departure call. Generic over
+    /// `L: Label` via the cache (the label parameter is inferred,
+    /// no turbofish needed). For server workloads doing many range
+    /// queries against the same timetable, this is the right entry
+    /// point.
+    fn raptor_range_with_cache<L: Label>(
+        &self,
+        cache: &mut RaptorCache<L>,
+        transfers: usize,
+        departures: impl IntoIterator<Item = Tau>,
+        origins: &[(StopIdx, Tau)],
+        targets: &[(StopIdx, Tau)],
+    ) -> Vec<RangeJourney<L>>
+    where
+        Self: Sized,
+    {
+        let mut all: Vec<RangeJourney<L>> = Vec::new();
+        for depart in departures {
+            let journeys =
+                self.raptor_with_cache_and_label(cache, transfers, depart, origins, targets);
+            for j in journeys {
+                all.push(RangeJourney { depart, journey: j });
+            }
+        }
+
+        // Pareto profile filter on (later depart, fewer transfers,
+        // dominated label). Sort so that the entries we'd prefer to
+        // keep come first: later departure first (don't make the user
+        // leave earlier than necessary), then fewer transfers, then
+        // earlier arrival.
+        all.sort_by(|a, b| {
+            b.depart
+                .cmp(&a.depart)
+                .then(a.journey.plan.len().cmp(&b.journey.plan.len()))
+                .then(a.journey.arrival().cmp(&b.journey.arrival()))
+        });
+        let mut front: Vec<RangeJourney<L>> = Vec::with_capacity(all.len());
+        'outer: for r in all {
+            for f in &front {
+                if f.depart >= r.depart
+                    && f.journey.plan.len() <= r.journey.plan.len()
+                    && f.journey.label.dominates(&r.journey.label)
+                {
+                    continue 'outer;
+                }
+            }
+            front.retain(|f| {
+                !(r.depart >= f.depart
+                    && r.journey.plan.len() <= f.journey.plan.len()
+                    && r.journey.label.dominates(&f.journey.label))
+            });
+            front.push(r);
+        }
+        front
+    }
+}
+
+/// One entry in a range-query profile: a departure time paired with
+/// the [`Journey`] it produces. Returned by
+/// [`Timetable::raptor_range`] / [`Timetable::raptor_range_with_cache`].
+#[derive(Debug, Clone)]
+pub struct RangeJourney<L: Label = ArrivalTime> {
+    /// The departure time this journey assumes — the user leaves the
+    /// origin (or starts the origin walk) at this time.
+    pub depart: Tau,
+    /// The journey itself, as if `depart` had been passed to
+    /// [`Timetable::raptor`] directly.
+    pub journey: Journey<L>,
 }
 
 /// Reusable scratch buffers for [`Timetable::raptor_with_cache`].
