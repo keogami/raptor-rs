@@ -1,52 +1,10 @@
 # raptor-rs
 
-Rust implementation of the RAPTOR (Round-bAsed Public Transit Routing) algorithm.
+Rust implementation of [RAPTOR](https://www.microsoft.com/en-us/research/publication/round-based-public-transit-routing/) (Delling, Pajor, Werneck): given a transit network, find all Pareto-optimal journeys between two stops, trading fewer transfers against earlier arrival.
 
-Given a transit network, RAPTOR finds all Pareto-optimal journeys between two
-stops – trading off between fewer transfers and earlier arrival.
+## Quick start
 
-Based on the paper: [*Round-Based Public Transit Routing*](https://www.microsoft.com/en-us/research/publication/round-based-public-transit-routing/) by Delling, Pajor, and Werneck.
-
-## Concepts
-
-RAPTOR proceeds in *rounds*. Round k holds the earliest known arrival time
-at every stop reachable using at most k trips. Each round scans the routes
-that touched a stop improved in the previous round, then relaxes walking
-footpaths to a fixed point. The output is a Pareto front: one journey per
-trip count between `0` and `max_transfers`, with strictly earlier arrivals
-as you allow more trips. There is no Dijkstra-style priority queue and no
-shortest-path tree – just successive rounds of array updates.
-
-The default routing is *single-criterion*: minimise arrival time, then
-report one journey per trip count. For problems where a single best answer
-is the wrong shape – "show me a slower route with less walking" – swap in a
-multi-criterion `Label` (e.g. the bundled `ArrivalAndWalk`) and the algorithm
-returns a real Pareto front trading off the criteria you care about. The
-`Label` trait is the only seam in the algorithm where this plugs in; the
-core scan is unchanged.
-
-The public surface is small. Implement (or use) the `Timetable` trait to
-describe a transit network – `GtfsTimetable` does this for any GTFS feed —
-then build queries with `tt.query().from(...).to(...).depart_at(...).run()`.
-A `RaptorCache` reuses scratch allocations across queries against the same
-timetable, useful for server workloads; a `RaptorCachePool` does the same
-across threads, and range queries can fan their per-departure work across
-cores via `.run_par()` (under the default-on `parallel` feature). Per-leg
-trip and timing reconstruction is opt-in via `journey.with_timing(...)`;
-`Journey.plan` on its own is just `(route, alight stop)` topology.
-
-Things you can usually ignore until you need them: the `Label` trait
-(default is fine for normal routing); the `Timetable` trait internals
-(only relevant if you have non-GTFS data); range queries via
-`.depart_in_window(...)` (only if you want a profile rather than one
-departure); and `RaptorCache` (only worth it if you run many queries
-back-to-back).
-
-## Quick start: query a GTFS feed
-
-The `gtfs` module wraps a parsed GTFS feed (via the
-[`gtfs-structures`](https://crates.io/crates/gtfs-structures) crate) and
-implements the `Timetable` trait for it. Most users start here.
+The `gtfs` module wraps a parsed GTFS feed and implements the `Timetable` trait. The repo bundles `aux/dmrc_gtfs.zip` (Delhi Metro) so you can run the example without downloading anything:
 
 ```rust
 use gtfs_structures::Gtfs;
@@ -54,16 +12,13 @@ use jiff::civil::date;
 use raptor::{SecondOfDay, Timetable};
 use raptor::gtfs::GtfsTimetable;
 
-let gtfs = Gtfs::new("path/to/gtfs.zip")?;
-// GTFS feeds describe many service days; pin the timetable to one date.
-// Trips whose service_id is not active on this day are filtered out.
-let timetable = GtfsTimetable::new(&gtfs, date(2026, 5, 4))?;
+let gtfs = Gtfs::new("aux/dmrc_gtfs.zip")?;
+let tt = GtfsTimetable::new(&gtfs, date(2024, 1, 15))?;
 
-// The query takes dense u32 indices, not GTFS string IDs – resolve first.
-let start = timetable.stop_idx("dilshad_garden").expect("unknown stop");
-let target = timetable.stop_idx("vishwavidyalaya").expect("unknown stop");
+let start = tt.stop_idx("1").expect("Dilshad Garden");
+let target = tt.stop_idx("44").expect("Vishwavidyalaya");
 
-let journeys = timetable
+let journeys = tt
     .query()
     .from(start)
     .to(target)
@@ -71,308 +26,157 @@ let journeys = timetable
     .depart_at(SecondOfDay::hms(9, 0, 0))
     .run();
 
-for journey in &journeys {
-    print!("arrives {}s, plan: ", journey.arrival());
-    for (route_idx, stop_idx) in &journey.plan {
-        let route = timetable.route_id(*route_idx);   // original GTFS route_id
-        let stop = timetable.stop_id(*stop_idx);      // original GTFS stop_id
-        print!("[{route} -> {stop}] ");
-    }
-    println!();
+for j in &journeys {
+    println!("{} trip(s), arrives {}", j.plan.len(), j.arrival());
 }
 ```
 
-A returned `Journey` has `plan: Vec<(RouteIdx, StopIdx)>` (each entry is
-"take this route, get off at this stop"), plus `origin` and `target` fields
-recording which user-supplied stops the algorithm picked, and a `label: L`
-that for the default single-criterion `ArrivalTime` carries the effective
-arrival time. Use `journey.arrival()` to read it as a `SecondOfDay` (seconds since
-midnight, including the chosen target's walk-time offset). Each returned
-journey is Pareto-optimal: arrival strictly decreases as trip count
-increases, and no two returned journeys weakly dominate each other.
+Runnable as `cargo run --example gtfs-timetable -- aux/dmrc_gtfs.zip 2024-01-15 1 44`.
 
-For station-level queries (where any platform of a parent station is an
-acceptable origin or target), `GtfsTimetable::station_stops(parent_id)`
-returns the children as a slice ready to pass to `.from(...)` / `.to(...)`:
+A returned `Journey` has `plan: Vec<(RouteIdx, StopIdx)>` ("take this route, get off at this stop"), an `origin` and `target` (relevant when the query supplies multiple of either), and a `label` carrying the criterion under optimisation. `journey.arrival()` reads it as a `SecondOfDay`. See [`Journey`](https://docs.rs/raptor/latest/raptor/struct.Journey.html) for the full contract; for trip IDs and per-leg depart/arrive times see [`Journey::with_timing`](https://docs.rs/raptor/latest/raptor/struct.Journey.html#method.with_timing).
+
+## Worked examples
+
+### Berlin VBB: station-level query
+
+A station like Berlin Hbf has hundreds of platforms; you don't usually care which one. `GtfsTimetable::station_stops(parent_id)` expands a parent station to its child platforms and the multi-source/multi-target search picks the best combination:
 
 ```rust,ignore
-let journeys = timetable
+let tt = GtfsTimetable::new(&gtfs, date(2026, 5, 4))?;
+
+let journeys = tt
     .query()
-    .from(timetable.station_stops("berlin_hbf"))   // 301 platforms
-    .to(timetable.station_stops("berlin_alex"))    // 50 platforms
+    .from(tt.station_stops("de:11000:900003201"))   // Hbf — ~301 platforms
+    .to(tt.station_stops("de:11000:900100003"))     // Alex — ~50 platforms
     .max_transfers(10)
     .depart_at(SecondOfDay::hms(9, 0, 0))
     .run();
 ```
 
-A runnable version of the above is in `examples/gtfs-timetable.rs`:
+Returns a direct S-Bahn boarding at 09:01, arriving Alex at 09:07 — across a feed of ~42k stops, ~71k active trips, in ~385 µs.
 
-```bash
-cargo run --example gtfs-timetable -- path/to/gtfs.zip start_id target_id
-```
+### Helsinki HSL: augmenting sparse footpaths
 
-## Performance
-
-Single-query latency on the bundled Delhi Metro feed
-(`aux/dmrc_gtfs.zip` – 262 stops, 36 routes, 5,438 trips), measured with
-[`criterion`](https://crates.io/crates/criterion) on Apple Silicon (M-series),
-warm cache reused across iterations:
-
-| Query                                   | Median latency |
-|-----------------------------------------|----------------|
-| Direct, 1 trip (Dilshad Garden→Shahdara)| 9 µs           |
-| 2-trip with one interchange             | 38 µs          |
-| 3-trip across three lines               | 73 µs          |
-
-Construction (parsing the GTFS zip + building the indexed timetable)
-dominates at ~98 ms – pay it once at startup, then queries are essentially
-free. For server workloads doing many queries against the same timetable,
-reuse a [`RaptorCache`](#reusing-a-raptorcache) to amortise scratch-buffer
-allocation.
-
-To reproduce these numbers on your own hardware:
-
-```bash
-cargo bench -p raptor --features gtfs-bench --bench gtfs
-```
-
-For numbers on larger feeds – Helsinki HSL (~8k stops), Berlin VBB
-(~42k stops), Paris IDFM (~54k stops) – see
-[`docs/cross-city-benchmarks.md`](docs/cross-city-benchmarks.md). That
-page also documents the real-feed correctness work that the cross-city
-run drove (parent-station aggregation, calendar filtering,
-transfer-graph density), all of which now have shipped fixes.
-
-## Reading a Journey
-
-A `Journey<L>` has a `plan` and a `label`. The plan is a
-`Vec<(RouteIdx, StopIdx)>` – each entry means "take this route, get off at
-this stop". The source stop is implicit; it is not part of the plan. The
-`label: L` is the algorithm's per-stop label at the target; for the default
-single-criterion `ArrivalTime`, `journey.arrival()` (a method) returns the
-effective arrival time as a `SecondOfDay`.
-
-The plan records transit boardings only. If the optimal journey ends with a
-walk leg from the last boarded alight stop to the target, the plan still
-ends at the boarded alight stop and `arrival()` reflects the walk-derived
-arrival time at the target. Compare `journey.plan.last()`'s stop with your
-target to detect this case.
-
-For custom labels (e.g. tracking accumulated walking time alongside arrival),
-see the `Label` trait and `Timetable::query_with_label::<L>()` (which mirrors
-`.query()` exactly but returns a `Query<..., L, ...>`). The single-criterion
-`ArrivalTime` impl is the default and inlines to plain `SecondOfDay` operations.
-
-The `raptor::labels` module ships canned multi-criterion impls – currently
-`ArrivalAndWalk`, which returns a Pareto front of journeys trading off
-arrival time against accumulated walking time. Useful for accessibility-aware
-queries ("show me a slower route with less walking").
-
-### Per-leg timing
-
-`Journey.plan` is just topology – to recover the specific trips ridden and
-their per-leg departure/arrival times, call
-`journey.with_timing(&tt, tau, origin_walk)`:
+HSL ships an empty `transfers.txt`, so out of the box no walking transfers exist between physical stops. Build coordinate-derived walking edges before querying:
 
 ```rust,ignore
-for leg in journey.with_timing(&tt, tau, Duration::ZERO).unwrap() {
-    println!(
-        "board {} on {} at {}s, alight {} at {}s (trip {})",
-        leg.board, leg.route, leg.depart, leg.alight, leg.arrive, leg.trip,
-    );
-}
+let tt = GtfsTimetable::new(&gtfs, date(2026, 5, 4))?
+    .with_walking_footpaths(&gtfs, 500.0, 1.4);   // 500 m at 5 km/h
+
+let journeys = tt
+    .query()
+    .from(tt.stop_idx("1040601").unwrap())   // Kamppi metro
+    .to(tt.stop_idx("1453601").unwrap())     // Itäkeskus metro
+    .max_transfers(10)
+    .depart_at(SecondOfDay::hms(9, 0, 0))
+    .run();
 ```
 
-Walking transfers between consecutive transit legs are implicit (the gap in
-timestamps reflects the walk). See `TimedLeg`'s docs for details.
+`with_walking_footpaths` uses an R-tree over an equirectangular projection (~0.5% accurate at city scale) and preserves any pre-existing `transfers.txt` entries.
 
-### Range queries
+### Paris IDFM: the expensive case
 
-For "leave between 17:00 and 18:00 – what are my options?" queries, swap the
-builder's `.depart_at(...)` for `.depart_in_window(...)`:
+Châtelet → Versailles Rive Droite crosses the IDFM region: the expanded RER feed has ~54k stops, ~146k active trips per weekday, and the optimal journey involves the RER C from Saint-Michel-Notre-Dame:
 
 ```rust,ignore
-use raptor::SecondOfDay;
+let tt = GtfsTimetable::new(&gtfs, date(2026, 5, 4))?
+    .assert_footpaths_closed();   // IDFM's transfers.txt is publisher-curated
+
+let journeys = tt
+    .query()
+    .from(tt.stop_idx("IDFM:monomodalStopPlace:45102").unwrap())   // Châtelet
+    .to(tt.stop_idx("IDFM:monomodalStopPlace:44602").unwrap())     // Versailles RD
+    .max_transfers(10)
+    .depart_at(SecondOfDay::hms(9, 0, 0))
+    .run();
+```
+
+Returns in ~17 ms. Smaller cross-Paris queries (Châtelet → Gare du Nord, Châtelet → La Défense) come back in under 1 ms. See [`docs/cross-city-benchmarks.md`](docs/cross-city-benchmarks.md) for the full numbers and methodology.
+
+### Range queries: "leave between X and Y"
+
+```rust,ignore
 let profile = tt
     .query()
     .from(start)
-    .to(end)
+    .to(target)
     .max_transfers(10)
     .depart_in_window(SecondOfDay::every(
         SecondOfDay::hms(17, 0, 0),
         SecondOfDay::hms(18, 0, 0),
-        60,
+        300,   // every 5 minutes
     ))
     .run();
-for entry in &profile {
-    println!("leave at {}, arrive at {}", entry.depart, entry.journey.arrival());
-}
 ```
 
-The returned `Vec<RangeJourney>` is Pareto-optimal on
-`(later depart, fewer transfers, dominated label)` – duplicates and
-strictly-worse alternatives are dropped automatically. See `RangeJourney`'s
-docs for the exact contract. The serial implementation runs rRAPTOR
-(paper §4): a single reverse-chronological scan that reuses labels across
-departures rather than running N independent RAPTOR calls. The parallel
-paths (`.run_par()` / `.run_with_pool(...)`) keep the naïve-batch shape
-fanned across cores, since rRAPTOR is inherently sequential within a
-window.
+Returns `Vec<RangeJourney>` — each entry is a `(depart, journey)` pair, Pareto-filtered on `(later depart, fewer transfers, earlier arrival)`. Serial uses [rRAPTOR](https://docs.rs/raptor/latest/raptor/trait.Timetable.html#method.query) (single reverse-chronological scan reusing labels across departures); `.run_par()` spreads the per-departure work across a Rayon thread pool.
 
-To translate index newtypes back to your adapter's external IDs, the bundled
-GTFS adapter exposes `GtfsTimetable::stop_id(stop_idx)` and
-`GtfsTimetable::route_id(route_idx)`. The synthetic-route splitting (one GTFS
-`route_id` may map to several `RouteIdx`s – one per equivalence class of
-trips with identical, non-overtaking stop sequences) is documented on
-`GtfsTimetable`; `routes_for_gtfs_id(&str)` enumerates the synthetics
-derived from a single GTFS route.
+### Server workload: many queries, multi-threaded
 
-## Reusing a `RaptorCache`
-
-A `.run()` call allocates fresh scratch buffers. For server workloads doing
-many queries against the same timetable, allocate a `RaptorCache` once and
-finish each builder chain with `.run_with_cache(&mut cache)`:
-
-```rust
-use raptor::{RaptorCache, SecondOfDay, Timetable};
-
-let mut cache = RaptorCache::for_timetable(&timetable);
-for q in queries {
-    let journeys = timetable
-        .query()
-        .from(&q.origins)
-        .to(&q.targets)
-        .max_transfers(q.transfers)
-        .depart_at(q.tau)
-        .run_with_cache(&mut cache);
-    // ...
-}
-```
-
-A `RaptorCache` is sized for a specific timetable's `n_stops()`/`n_routes()`.
-Calling `.run_with_cache(...)` with a cache whose dimensions differ from the
-timetable in scope panics on entry – share a cache only across queries
-against the same timetable. If you do not have the timetable in scope at
-cache-construction time, `RaptorCache::with_capacity(n_stops, n_routes)` is
-the count-only equivalent.
-
-The cache is reset at the start of each call but retains its heap
-allocations. A single `RaptorCache` is not thread-safe; give each worker
-thread its own — or hand them a shared `RaptorCachePool` (next section).
-
-## Parallel queries
-
-The `parallel` feature (on by default) brings in [Rayon](https://crates.io/crates/rayon)
-and unlocks two parallel entry points for range queries:
+Allocate a `RaptorCachePool` once and have each thread check out a cache:
 
 ```rust,ignore
-use raptor::{RaptorCachePool, SecondOfDay, Timetable};
+use rayon::prelude::*;
+use raptor::RaptorCachePool;
 
-// One pool, sized for this timetable, shared across many range queries.
-let pool = RaptorCachePool::for_timetable(&timetable);
+let pool = RaptorCachePool::for_timetable(&tt);
 
-let profile = timetable
-    .query()
-    .from(start)
-    .to(end)
-    .max_transfers(10)
-    .depart_in_window(SecondOfDay::every(
-        SecondOfDay::hms(17, 0, 0),
-        SecondOfDay::hms(18, 0, 0),
-        60,
-    ))
-    .run_with_pool(&pool);   // fans across Rayon's global thread pool
+let results: Vec<_> = queries.par_iter().map(|q| {
+    let mut cache = pool.checkout();
+    tt.query()
+        .from(q.from)
+        .to(q.to)
+        .max_transfers(10)
+        .depart_at(q.depart)
+        .run_with_cache(&mut cache)
+}).collect();
 ```
 
-`.run_par()` is the no-pool shortcut (allocates an internal pool for the
-call, then drops it). Output of `.run_par()` / `.run_with_pool(&pool)` is
-identical to the serial `.run()`; only the per-departure work fans out.
+The pool's `checkout()` returns an RAII guard that returns the cache on drop; same pool serves any number of threads with no per-thread bookkeeping.
 
-`RaptorCachePool` is also useful without Rayon — it's `Sync`, so each
-worker thread (or async task) can `.checkout()` a cache for one query and
-return it on drop. The same pool serves an arbitrary number of threads
-without per-thread bookkeeping.
+## Features
 
-A measurement on the bundled Delhi feed (60-departure window, 09:00–10:00
-in 1-minute steps, M-series Apple Silicon, 8 cores). The serial column is
-rRAPTOR (paper §4 reverse-chronological scan), not the naïve batch:
+- **`Timetable` trait** — describes a transit network. Use the bundled [`GtfsTimetable`](https://docs.rs/raptor/latest/raptor/gtfs/struct.GtfsTimetable.html) for any GTFS feed, or [implement directly](https://docs.rs/raptor/latest/raptor/trait.Timetable.html) for non-GTFS data.
+- **Typestate query builder** — `tt.query().from(...).to(...).max_transfers(...).depart_at(...).run()`. Compile-time enforced order; `.depart_at(...)` and `.depart_in_window(...)` switch the return type.
+- **Multi-source / multi-target** — `.from(...)` and `.to(...)` accept a `StopIdx`, a slice, a `Vec`, or `(stop, walk_offset)` pairs. Pair with `station_stops(parent_id)` for "any platform of this station" queries.
+- **Range queries** — `.depart_in_window(times)` returns a Pareto profile; serial path uses rRAPTOR, `.run_par()` and `.run_with_pool(&pool)` use a parallel naïve batch.
+- **`Label` trait** — single-criterion [`ArrivalTime`](https://docs.rs/raptor/latest/raptor/struct.ArrivalTime.html) is the default. [`raptor::labels`](https://docs.rs/raptor/latest/raptor/labels/index.html) ships [`ArrivalAndWalk`](https://docs.rs/raptor/latest/raptor/labels/struct.ArrivalAndWalk.html) for trade-off queries (slower routes with less walking). Implement [`Label`](https://docs.rs/raptor/latest/raptor/trait.Label.html) for fares, accessibility, etc.
+- **Walking footpaths from coordinates** — [`with_walking_footpaths(&gtfs, max_dist_m, speed_m_per_s)`](https://docs.rs/raptor/latest/raptor/gtfs/struct.GtfsTimetable.html#method.with_walking_footpaths) builds bidirectional R-tree walking edges, preserving any existing `transfers.txt`.
+- **Closed-footpath fast path** — if your `transfers.txt` is the entire intended relation, [`assert_footpaths_closed()`](https://docs.rs/raptor/latest/raptor/gtfs/struct.GtfsTimetable.html#method.assert_footpaths_closed) opts into a single-pass O(E) relaxation instead of Dijkstra.
+- **`RaptorCache`** — reusable scratch allocations across queries against one timetable. **`RaptorCachePool`** is the `Sync` variant for thread pools.
+- **Per-leg timing** — [`journey.with_timing(&tt, depart, origin_walk)`](https://docs.rs/raptor/latest/raptor/struct.Journey.html#method.with_timing) reconstructs trip IDs and per-leg depart/arrive times. `Journey.plan` alone is just topology.
 
-| Query                        | Serial (rRAPTOR) | Parallel (naïve batch) | Speedup |
-|------------------------------|------------------|------------------------|---------|
-| Direct, 1 trip               | 1.12 ms          | 195 µs                 | 5.7x    |
-| 2-trip with one interchange  | 1.35 ms          | 443 µs                 | 3.0x    |
-| 3-trip across three lines    | 1.84 ms          | 799 µs                 | 2.3x    |
+## When To Use What
 
-For wide windows on multicore the parallel path still wins, because
-rRAPTOR is sequential within a window. For single-core builds or
-narrow windows the serial rRAPTOR path wins.
+| Goal | API |
+| --- | --- |
+| Single query, default routing | `tt.query()...run()` |
+| Many queries, one server | allocate a `RaptorCache`, finish each chain with `.run_with_cache(&mut cache)` |
+| Same as above, multi-threaded | `RaptorCachePool::for_timetable(&tt)`, `pool.checkout()` per worker |
+| "Leave between X and Y" | `.depart_in_window(times).run()` (serial rRAPTOR), or `.run_par()` (multi-core wins on wide windows) |
+| "Slower route with less walking" | `tt.query_with_label::<ArrivalAndWalk>()...run()` |
+| Any platform of a station | `tt.station_stops(parent_id)` into `.from(...)` / `.to(...)` |
+| Sparse `transfers.txt` | `.with_walking_footpaths(&gtfs, max_dist_m, speed_m_per_s)` at construction |
+| Trip IDs and per-leg times in output | `journey.with_timing(&tt, depart, origin_walk)` |
 
-Compared with the previous naïve serial batch, rRAPTOR is markedly
-faster on non-trivial queries — the 2-trip case drops from 2.38 ms to
-1.35 ms (~43% faster) and the 3-trip case from 5.37 ms to 1.84 ms
-(~66% faster). The 1-trip case is the outlier: it's slightly slower
-than the old naïve serial (~547 µs → 1.12 ms) because rRAPTOR's per-τ
-overhead — the newly-active-stops scan and the label-bag insert checks
-— doesn't amortise on a single-route query. rRAPTOR wins where label
-reuse pays off, which is most non-trivial queries.
+## Perf
 
-For a single departure there is nothing to parallelise — `.run()`
-(single-departure) is unchanged.
+Single-query latency, warm `RaptorCache`, M-series Apple Silicon, single thread. Full numbers (load times, multi-trip queries, methodology) in [`docs/cross-city-benchmarks.md`](docs/cross-city-benchmarks.md):
 
-To opt out of Rayon (wasm, embedded, minimal builds), depend on raptor
-with `default-features = false`. The `RaptorCachePool` API stays
-available; only `.run_par()` / `.run_with_pool(...)` are gated off.
+| Feed | Stops | Trips/day | Representative query | Latency |
+| --- | ---: | ---: | --- | ---: |
+| Delhi Metro | 262 | 5,400 | 2-trip cross-network | 22 µs |
+| Helsinki HSL | 8,400 | 24,000 | Kamppi → Itäkeskus (with walking) | 5.9 ms |
+| Berlin VBB | 42,000 | 71,000 | Hbf → Alex (station-to-station) | 385 µs |
+| Paris IDFM | 54,000 | 146,000 | Châtelet → Versailles RD | 17 ms |
 
-## Implementing `Timetable` for a custom backend
+For range-query latencies (serial rRAPTOR vs parallel naïve batch), see the [bench source](raptor/benches/gtfs.rs) and the linked benchmark page.
 
-If you have transit data not in GTFS form, implement the `Timetable` trait.
-It is non-generic. Identifiers are dense `u32` newtypes – `StopIdx`,
-`RouteIdx`, `TripIdx` – and slice-returning accessors return plain `&[T]`
-(no `Cow`). Implementors expose two count methods – `n_stops()` and
-`n_routes()` – alongside the lookup methods the algorithm calls in its hot
-loop. Adapters are responsible for interning external identifiers (e.g. GTFS
-string IDs) to dense indices at construction.
+## Cargo features
 
-One contract the algorithm relies on:
-
-- **Trips on a route must share a stop sequence and not overtake.** The
-  algorithm binary-searches by departure time at intermediate stops. If your
-  data source groups trips with different stop patterns or overtaking pairs
-  under one route, split them at construction. The bundled GTFS adapter does
-  this automatically.
-
-Footpaths returned by `get_footpaths_from` describe direct walks only – they
-do not need to be transitively closed. The algorithm relaxes footpaths to a
-fixed point per round (multi-source Dijkstra), so chained walks `A → B → C`
-are reached automatically with the combined walk time.
-
-For adapters whose footpath relation *is* transitively closed (typically a
-publisher-curated `transfers.txt` treated as the entire intended relation),
-override `Timetable::footpaths_are_transitively_closed` to return `true`. The
-algorithm then uses a single-pass `O(E)` relaxation instead of Dijkstra's
-`O(E log V)` heap. `GtfsTimetable` ships with this returning `false` by
-default; opt in via `GtfsTimetable::assert_footpaths_closed()`.
-
-Both points are documented on the `Timetable` trait.
-
-### Walking footpaths from coordinates
-
-For GTFS feeds whose `transfers.txt` is empty or sparse,
-`GtfsTimetable::with_walking_footpaths(&gtfs, max_distance_m, walking_speed_m_per_s)`
-augments the footpath graph with bidirectional walking edges between every
-pair of stops within straight-line `max_distance_m`. It uses an R-tree over
-an equirectangular projection (accurate to ~0.5% at city scale) and
-preserves any existing `transfers.txt` entries.
-
-```rust,no_run
-use jiff::civil::date;
-use raptor::gtfs::GtfsTimetable;
-
-let gtfs = gtfs_structures::Gtfs::new("helsinki.zip")?;
-let tt = GtfsTimetable::new(&gtfs, date(2026, 5, 4))?
-    .with_walking_footpaths(&gtfs, 500.0, 1.4); // 500m at 5 km/h
-# Ok::<(), anyhow::Error>(())
-```
+- `parallel` (default-on) — pulls in `rayon`, enables `Query::run_par` / `Query::run_with_pool`. Opt out with `default-features = false` for wasm or minimal builds; `RaptorCachePool` itself stays available.
+- `gtfs-bench` — enables the `gtfs` criterion benchmark.
+- `internal` — enables the `raptor` criterion benchmark over `manual::SimpleTimetable`.
 
 ## License
 
