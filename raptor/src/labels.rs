@@ -27,8 +27,13 @@ use crate::{Duration, Label, Tau};
 /// use raptor::labels::ArrivalAndWalk;
 ///
 /// # fn run<T: Timetable>(tt: &T, start: StopIdx, target: StopIdx) {
-/// let journeys: Vec<Journey<ArrivalAndWalk>> =
-///     tt.raptor_with_label::<ArrivalAndWalk>(10, 32400, &[(start, 0)], &[(target, 0)]);
+/// let journeys: Vec<Journey<ArrivalAndWalk>> = tt
+///     .query_with_label::<ArrivalAndWalk>()
+///     .from(start)
+///     .to(target)
+///     .max_transfers(10u8)
+///     .depart_at(Tau::hms(9, 0, 0))
+///     .run();
 /// for j in &journeys {
 ///     println!(
 ///         "arrives {}s, walked {}s",

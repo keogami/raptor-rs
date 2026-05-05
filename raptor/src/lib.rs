@@ -13,7 +13,7 @@
 //! ```no_run
 //! use gtfs_structures::Gtfs;
 //! use jiff::civil::date;
-//! use raptor::Timetable;
+//! use raptor::{Tau, Timetable};
 //! use raptor::gtfs::GtfsTimetable;
 //!
 //! # fn main() -> anyhow::Result<()> {
@@ -22,12 +22,17 @@
 //! // service_id is not active on this day are filtered out at construction.
 //! let timetable = GtfsTimetable::new(&gtfs, date(2026, 5, 4))?;
 //!
-//! // `raptor` takes dense u32 indices, not GTFS string IDs — resolve first.
+//! // The query takes dense u32 indices, not GTFS string IDs — resolve first.
 //! let start = timetable.stop_idx("dilshad_garden").expect("unknown stop");
 //! let target = timetable.stop_idx("vishwavidyalaya").expect("unknown stop");
 //!
-//! // 10 = max transfers; 32400 = depart at 09:00 (seconds since midnight).
-//! let journeys = timetable.raptor(10, 32400, &[(start, 0)], &[(target, 0)]);
+//! let journeys = timetable
+//!     .query()
+//!     .from(start)
+//!     .to(target)
+//!     .max_transfers(10u8)
+//!     .depart_at(Tau::hms(9, 0, 0))
+//!     .run();
 //!
 //! for journey in &journeys {
 //!     print!("arrives {}s, plan: ", journey.arrival());
@@ -47,9 +52,10 @@
 //! implicit. The [`Journey`] type-level docs describe how walk legs at the
 //! end of a journey are represented.
 //!
-//! For server use cases doing many queries against the same timetable, reuse
-//! a [`RaptorCache`] via [`Timetable::raptor_with_cache`] to amortise
-//! scratch-buffer allocation.
+//! For server use cases doing many queries against the same timetable,
+//! allocate a [`RaptorCache`] once and pass it to `.run_with_cache(...)`
+//! at the end of each builder chain — amortises scratch-buffer allocation
+//! across queries.
 //!
 //! # Implementing [`Timetable`] for a custom backend
 //!
@@ -76,8 +82,10 @@ use smallvec::SmallVec;
 
 pub mod gtfs;
 pub mod labels;
-/// In-memory timetable for testing and simple use cases.
-pub mod simple;
+/// In-memory `Timetable` adapter you build by hand with `.route(...)` /
+/// `.footpath(...)` calls. Useful when your data isn't from a parsed
+/// GTFS feed — for tests, custom data sources, and toy examples.
+pub mod manual;
 
 #[cfg(test)]
 mod test;

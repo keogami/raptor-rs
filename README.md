@@ -16,7 +16,7 @@ implements the `Timetable` trait for it. Most users start here.
 ```rust
 use gtfs_structures::Gtfs;
 use jiff::civil::date;
-use raptor::Timetable;
+use raptor::{Tau, Timetable};
 use raptor::gtfs::GtfsTimetable;
 
 let gtfs = Gtfs::new("path/to/gtfs.zip")?;
@@ -24,14 +24,17 @@ let gtfs = Gtfs::new("path/to/gtfs.zip")?;
 // Trips whose service_id is not active on this day are filtered out.
 let timetable = GtfsTimetable::new(&gtfs, date(2026, 5, 4))?;
 
-// `raptor` takes dense u32 indices, not GTFS string IDs — resolve first.
+// The query takes dense u32 indices, not GTFS string IDs — resolve first.
 let start = timetable.stop_idx("dilshad_garden").expect("unknown stop");
 let target = timetable.stop_idx("vishwavidyalaya").expect("unknown stop");
 
-// `raptor` is multi-source / multi-target: pass each origin and target as
-// (stop, walk_time_offset). Single-stop queries use [(stop, 0)].
-// 10 = max transfers; 32400 = depart at 09:00 (seconds since midnight).
-let journeys = timetable.raptor(10, 32400, &[(start, 0)], &[(target, 0)]);
+let journeys = timetable
+    .query()
+    .from(start)
+    .to(target)
+    .max_transfers(10u8)
+    .depart_at(Tau::hms(9, 0, 0))
+    .run();
 
 for journey in &journeys {
     print!("arrives {}s, plan: ", journey.arrival());
@@ -55,12 +58,16 @@ increases, and no two returned journeys weakly dominate each other.
 
 For station-level queries (where any platform of a parent station is an
 acceptable origin or target), `GtfsTimetable::station_stops(parent_id)`
-returns the children as a slice ready to pass to `raptor`:
+returns the children as a slice ready to pass to `.from(...)` / `.to(...)`:
 
 ```rust,ignore
-let origins = timetable.station_stops("berlin_hbf");      // 301 platforms
-let targets = timetable.station_stops("berlin_alex");     // 50 platforms
-let journeys = timetable.raptor(10, 32400, origins, targets);
+let journeys = timetable
+    .query()
+    .from(timetable.station_stops("berlin_hbf"))   // 301 platforms
+    .to(timetable.station_stops("berlin_alex"))    // 50 platforms
+    .max_transfers(10u8)
+    .depart_at(Tau::hms(9, 0, 0))
+    .run();
 ```
 
 A runnable version of the above is in `examples/gtfs-timetable.rs`:
@@ -117,9 +124,9 @@ arrival time at the target. Compare `journey.plan.last()`'s stop with your
 target to detect this case.
 
 For custom labels (e.g. tracking accumulated walking time alongside arrival),
-see the `Label` trait and `Timetable::raptor_with_label::<L>` /
-`raptor_with_cache_and_label::<L>`. The single-criterion `ArrivalTime` impl
-is the default and inlines to plain `Tau` operations.
+see the `Label` trait and `Timetable::query_with_label::<L>()` (which mirrors
+`.query()` exactly but returns a `Query<..., L, ...>`). The single-criterion
+`ArrivalTime` impl is the default and inlines to plain `Tau` operations.
 
 The `raptor::labels` module ships canned multi-criterion impls — currently
 `ArrivalAndWalk`, which returns a Pareto front of journeys trading off
@@ -133,7 +140,7 @@ their per-leg departure/arrival times, call
 `journey.with_timing(&tt, tau, origin_walk)`:
 
 ```rust,ignore
-for leg in journey.with_timing(&tt, tau, 0).unwrap() {
+for leg in journey.with_timing(&tt, tau, Duration::ZERO).unwrap() {
     println!(
         "board {} on {} at {}s, alight {} at {}s (trip {})",
         leg.board, leg.route, leg.depart, leg.alight, leg.arrive, leg.trip,
@@ -146,13 +153,20 @@ timestamps reflects the walk). See `TimedLeg`'s docs for details.
 
 ### Range queries
 
-For "leave between 17:00 and 18:00 — what are my options?" queries, use
-`Timetable::raptor_range`:
+For "leave between 17:00 and 18:00 — what are my options?" queries, swap the
+builder's `.depart_at(...)` for `.depart_in_window(...)`:
 
 ```rust,ignore
-let profile = tt.raptor_range(10, (17 * 3600..18 * 3600).step_by(60), &origins, &targets);
+use raptor::Tau;
+let profile = tt
+    .query()
+    .from(start)
+    .to(end)
+    .max_transfers(10u8)
+    .depart_in_window((17 * 3600..18 * 3600).step_by(60).map(Tau::from_secs))
+    .run();
 for entry in &profile {
-    println!("leave at {}s, arrive at {}s", entry.depart, entry.journey.arrival());
+    println!("leave at {}, arrive at {}", entry.depart, entry.journey.arrival());
 }
 ```
 
@@ -173,27 +187,28 @@ derived from a single GTFS route.
 
 ## Reusing a `RaptorCache`
 
-Calling `Timetable::raptor` allocates fresh scratch buffers on every query.
-For server workloads doing many queries against the same timetable, prefer
-`raptor_with_cache`:
+A `.run()` call allocates fresh scratch buffers. For server workloads doing
+many queries against the same timetable, allocate a `RaptorCache` once and
+finish each builder chain with `.run_with_cache(&mut cache)`:
 
 ```rust
-use raptor::{RaptorCache, Timetable};
+use raptor::{RaptorCache, Tau, Timetable};
 
 let mut cache = RaptorCache::for_timetable(&timetable);
-for query in queries {
-    let journeys = timetable.raptor_with_cache(
-        &mut cache, query.transfers, query.tau, &query.origins, &query.targets,
-    );
+for q in queries {
+    let journeys = timetable
+        .query()
+        .from(&q.origins)
+        .to(&q.targets)
+        .max_transfers(q.transfers)
+        .depart_at(q.tau)
+        .run_with_cache(&mut cache);
     // ...
 }
 ```
 
-Where `query.origins` and `query.targets` are `Vec<(StopIdx, Tau)>` — the same
-shape `Timetable::raptor` takes.
-
 A `RaptorCache` is sized for a specific timetable's `n_stops()`/`n_routes()`.
-Calling `raptor_with_cache` with a cache whose dimensions differ from the
+Calling `.run_with_cache(...)` with a cache whose dimensions differ from the
 timetable in scope panics on entry — share a cache only across queries
 against the same timetable. If you do not have the timetable in scope at
 cache-construction time, `RaptorCache::with_capacity(n_stops, n_routes)` is

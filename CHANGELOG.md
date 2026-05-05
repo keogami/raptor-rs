@@ -1,5 +1,133 @@
 # Changelog
 
+## [0.14.0] — 2026-05-05
+
+API ergonomics pass. The query surface collapses from six methods to one
+typestate builder; primitive `usize` timestamps and walk-time offsets become
+typed `Tau` / `Duration` / `Transfers` newtypes; the `simple` adapter
+renames to `manual`. Mass breakage with no compatibility shim — pre-release,
+the cleaner shape wins.
+
+### New types
+
+- `pub struct Tau(pub u32)` — was `pub type Tau = usize`. A timestamp,
+  seconds since midnight. `ZERO`, `MAX`, `from_secs`, `hms`, `as_secs`,
+  `as_hms`, `From<u32>`, `Display`, plus the arithmetic impls below.
+- `pub struct Duration(pub u32)` — a length of time, distinct from `Tau`.
+  Walk-time offsets, transfer times, dwell times all use `Duration`.
+- `pub struct Transfers(pub u8)` — user-facing transfer cap (255 is plenty;
+  RAPTOR's interest is in low-transfer journeys).
+- `pub struct Endpoints { stops: SmallVec<[(StopIdx, Duration); 50]> }` and
+  `pub trait IntoEndpoints` so single-stop, slice, and Vec inputs all
+  unify at the call site.
+- `pub struct Query<'tt, T, L = ArrivalTime, M = NeedsDeparture>` —
+  typestate builder; `M` transitions through `NeedsDeparture` →
+  `SingleDeparture` / `RangeDeparture`.
+
+### Arithmetic
+
+- `Tau + Duration → Tau` (saturating).
+- `Tau - Tau → Duration` (saturating to `Duration::ZERO`).
+- `Tau - Duration → Tau` (saturating to `Tau::ZERO`).
+- `Duration + Duration → Duration` (saturating).
+
+### Trait surface
+
+The `Timetable` trait's query API is now:
+
+- `tt.query() -> Query<...>` — entry point for the builder.
+- `tt.query_with_label::<L>() -> Query<..., L, ...>` — same, custom label.
+
+The six methods that were here in v0.13.x (`raptor`, `raptor_with_label`,
+`raptor_with_cache`, `raptor_with_cache_and_label`, `raptor_range`,
+`raptor_range_with_cache`) are gone. The two algorithm-entry methods
+(`raptor_with_cache_and_label`, `raptor_range_with_cache`) remain on the
+trait but are `#[doc(hidden)]` — `Query::run` / `Query::run_with_cache`
+dispatch through them.
+
+### Builder usage
+
+```rust,ignore
+let journeys = tt
+    .query()
+    .from(start)              // bare StopIdx, slice, or Vec
+    .to(end)
+    .max_transfers(10u8)      // u8, defaults to Transfers(10)
+    .depart_at(Tau::hms(9, 0, 0))
+    .run();
+
+// Range query — same shape, swap the departure method:
+let profile = tt
+    .query()
+    .from(start).to(end)
+    .max_transfers(10u8)
+    .depart_in_window((17 * 3600..18 * 3600).step_by(60).map(Tau::from_secs))
+    .run();
+
+// Reuse a cache:
+let mut cache = RaptorCache::for_timetable(&tt);
+let journeys = tt.query().from(start).to(end)
+    .depart_at(Tau::hms(9, 0, 0))
+    .run_with_cache(&mut cache);
+```
+
+`.run()` is only callable once a departure mode is set — the typestate
+prevents `tt.query().from(s).to(t).run()` from compiling, since there's
+no `.run()` method on `Query<..., NeedsDeparture>`.
+
+### Module rename
+
+`raptor::simple` → `raptor::manual`. The new name reflects what the
+adapter is — a `Timetable` you build by hand with `.route(...)` /
+`.footpath(...)` calls — rather than reading as "example code". External
+imports change accordingly.
+
+### Migration
+
+Every existing call site of the removed `raptor*` methods needs to be
+rewritten to the builder. The shape is mechanical:
+
+```rust,ignore
+// Before:
+tt.raptor(K, T, &[(s, 0)], &[(t, 0)])
+// After:
+tt.query().from(s).to(t).max_transfers(K as u8).depart_at(T).run()
+
+// Before:
+tt.raptor_with_cache(&mut cache, K, T, &origins, &targets)
+// After:
+tt.query().from(&origins).to(&targets).max_transfers(K as u8)
+    .depart_at(T).run_with_cache(&mut cache)
+```
+
+For multi-criterion (custom `Label`):
+
+```rust,ignore
+// Before:
+tt.raptor_with_label::<MyLabel>(K, T, &origins, &targets)
+// After:
+tt.query_with_label::<MyLabel>().from(&origins).to(&targets)
+    .max_transfers(K as u8).depart_at(T).run()
+```
+
+`Tau` literals must be wrapped — `0` becomes `Tau(0)`, `Tau::ZERO`,
+or `Tau::from_secs(0)`. `Duration` walk-time offsets become
+`Duration::ZERO` or `Duration(N)`. The cross-city benchmark example,
+the test suite, the proptest harness, and the dotgraph adapter were
+all migrated automatically by a paren-aware Python script with a
+handful of hand-edits for the awkward shapes.
+
+### Tests
+
+- `into_endpoints_accepts_natural_input_shapes` exercises 6 input
+  shapes for the same query.
+- `query_builder_single_departure` covers the bare flow,
+  `max_transfers(N)`, `run_with_cache(&mut cache)`, and the
+  `query_with_label::<L>` path.
+- `query_builder_range_departure` covers `.depart_in_window(...)`
+  against a 3-trip route.
+- 58/58 tests + proptests + doctests green.
+
 ## [0.13.1] — 2026-05-05
 
 Naïve batch range query API. Lands the user-facing range-query

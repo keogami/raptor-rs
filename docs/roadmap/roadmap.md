@@ -396,17 +396,17 @@ Most users don't actually want "best journey departing at exactly
 window". rRAPTOR (described in §4 of the paper) does this efficiently
 by sharing work across departure times.
 
-**Status (v0.13.1):** the user-facing API has landed in naïve batch
-form — `Timetable::raptor_range(transfers, departures, origins,
-targets) -> Vec<RangeJourney>`. Implementation just loops over the
-caller-supplied departures, sharing only the `RaptorCache`. Output
-is Pareto-filtered to a true profile, so callers writing against
-this API today won't have to migrate when the proper algorithm
-rewrite lands.
+**Status (v0.14):** the user-facing API has landed in naïve batch
+form via the typestate builder — `tt.query().from(...).to(...)
+.depart_in_window(...).run() -> Vec<RangeJourney>`. Implementation
+just loops over the caller-supplied departures, sharing only the
+`RaptorCache`. Output is Pareto-filtered to a true profile, so
+callers writing against this API today won't have to migrate when
+the proper algorithm rewrite lands.
 
 The proper rRAPTOR algorithm (single reverse-chronological scan
-that reuses labels across departure events) is queued for a future
-release after the planned API ergonomics pass.
+that reuses labels across departure events) is the planned next
+substantial piece of algorithmic work.
 
 ### 3.2 GTFS-RT (real-time updates)
 

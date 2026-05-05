@@ -3,7 +3,7 @@
 //!
 //! See `lib.rs` for the trip-count convention banner.
 
-use raptor::simple::SimpleTimetable;
+use raptor::manual::SimpleTimetable;
 
 /// Top-level spec for one randomly-generated test case.
 #[derive(Debug, Clone)]

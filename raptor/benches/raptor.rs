@@ -1,6 +1,6 @@
 use criterion::{BenchmarkId, Criterion, criterion_group, criterion_main};
 use raptor::Timetable;
-use raptor::simple::builders::*;
+use raptor::manual::builders::*;
 use raptor::{Duration, Tau};
 
 /// Routes from the first stop to the last on a single route. Tests how performance

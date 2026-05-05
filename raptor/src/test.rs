@@ -2,7 +2,7 @@ use crate::Duration;
 use crate::RaptorCache;
 use crate::Tau;
 use crate::Timetable;
-use crate::simple::SimpleTimetable;
+use crate::manual::SimpleTimetable;
 
 macro_rules! plan {
     ($tt:expr; $(($route:expr, $stop:expr)),* $(,)?) => {

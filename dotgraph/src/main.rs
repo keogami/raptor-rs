@@ -1,5 +1,5 @@
 use clap::{Parser, Subcommand};
-use raptor::simple::builders;
+use raptor::manual::builders;
 
 #[derive(Parser)]
 #[command(
