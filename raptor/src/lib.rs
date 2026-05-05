@@ -1923,8 +1923,10 @@ pub struct SingleDeparture {
 }
 
 /// Marker type: a range-query `Query` over a window of departure
-/// times (collected eagerly into a `Vec<SecondOfDay>` at builder time).
-/// `.run()` returns `Vec<RangeJourney<L>>`.
+/// times. The supplied iterator is collected eagerly at builder time
+/// and normalised to a descending, deduplicated `Vec<SecondOfDay>`
+/// (the order rRAPTOR scans them in). `.run()` returns
+/// `Vec<RangeJourney<L>>`.
 #[derive(Debug, Clone)]
 pub struct RangeDeparture {
     departures: Vec<SecondOfDay>,
@@ -2010,8 +2012,12 @@ where
     }
 
     /// Configure a range query over the supplied departure times.
-    /// Collected eagerly into a `Vec<SecondOfDay>` at builder time. After
-    /// this call, `.run()` returns `Vec<RangeJourney<L>>`.
+    /// The iterator is collected eagerly at builder time and normalised
+    /// to descending, deduplicated order (the order rRAPTOR scans them
+    /// in; the parallel naïve-batch path is order-insensitive). After
+    /// this call, `.run()` returns `Vec<RangeJourney<L>>` (for
+    /// `L = ArrivalTime` via the rRAPTOR specialisation; for other
+    /// labels only the parallel paths are exposed).
     pub fn depart_in_window(
         self,
         deps: impl IntoIterator<Item = SecondOfDay>,

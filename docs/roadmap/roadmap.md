@@ -396,17 +396,26 @@ Most users don't actually want "best journey departing at exactly
 window". rRAPTOR (described in §4 of the paper) does this efficiently
 by sharing work across departure times.
 
-**Status (v0.14):** the user-facing API has landed in naïve batch
-form via the typestate builder — `tt.query().from(...).to(...)
-.depart_in_window(...).run() -> Vec<RangeJourney>`. Implementation
-just loops over the caller-supplied departures, sharing only the
-`RaptorCache`. Output is Pareto-filtered to a true profile, so
-callers writing against this API today won't have to migrate when
-the proper algorithm rewrite lands.
+**Status (landed):** the rRAPTOR algorithm (paper §4 single
+reverse-chronological scan that reuses labels across departure
+events) is now the serial range-query path, wired through
+`Query<ArrivalTime, RangeDeparture>::run` /
+`.run_with_cache(&mut cache)` (rrap plan tasks T1–T8). Output shape
+is unchanged from the v0.14 naïve batch — the same
+Pareto-filtered `Vec<RangeJourney>` profile — so callers don't need
+to migrate.
 
-The proper rRAPTOR algorithm (single reverse-chronological scan
-that reuses labels across departure events) is the planned next
-substantial piece of algorithmic work.
+The parallel paths (`.run_par()` / `.run_with_pool(&pool)`) keep the
+naïve-batch shape fanned across Rayon, since rRAPTOR is inherently
+sequential within a window and the parallel shape works for any
+`L: Label + Send + Sync`.
+
+This is a single-criterion specialisation: only `L = ArrivalTime`
+takes the rRAPTOR path. Multi-criterion (McProfileRAPTOR over
+custom labels in a single profile scan) is a separate piece of work
+and not currently scheduled.
+
+Reference: `docs/superpowers/specs/2026-05-05-rraptor-design.md`.
 
 ### 3.2 GTFS-RT (real-time updates)
 

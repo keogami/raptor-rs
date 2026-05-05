@@ -34,6 +34,28 @@ The serial `.run()` / `.run_with_cache(&mut cache)` paths are unchanged.
   `.run_with_pool(...)`. Opt out with `default-features = false` for
   wasm or minimal builds; `RaptorCachePool` itself stays available.
 
+### rRAPTOR for serial range queries
+
+The serial range-query path (`Query::run` / `.run_with_cache` for
+`L = ArrivalTime`) now runs the rRAPTOR algorithm from §4 of the
+original paper — a single reverse-chronological scan that reuses
+labels across departures, instead of N independent RAPTOR runs.
+
+Output shape and semantics unchanged. Bench numbers (60-departure
+window, Delhi feed): 2-trip 2.38 ms → 1.35 ms (~43% faster);
+3-trip 5.37 ms → 1.84 ms (~66% faster). The trivial 1-trip case
+is slightly slower (~547 µs → 1.12 ms) because the per-τ overhead
+doesn't amortise on a single-route query; rRAPTOR wins where label
+reuse pays off, which is most non-trivial queries.
+
+#### Breaking for custom-Label range queries
+
+`Query<L, RangeDeparture>` no longer exposes `.run()` /
+`.run_with_cache()` for arbitrary `L: Label`; those are restricted to
+`L = ArrivalTime`. Custom-Label range queries use `.run_par()` /
+`.run_with_pool()` which keep the naïve-batch semantics for any
+`L: Label + Send + Sync`.
+
 ## [0.14.0] — 2026-05-05
 
 API ergonomics pass. The query surface collapses from six methods to one

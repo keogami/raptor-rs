@@ -212,9 +212,12 @@ for entry in &profile {
 The returned `Vec<RangeJourney>` is Pareto-optimal on
 `(later depart, fewer transfers, dominated label)` – duplicates and
 strictly-worse alternatives are dropped automatically. See `RangeJourney`'s
-docs for the exact contract. The current implementation is a naïve batch
-(one call per departure with shared `RaptorCache`); a proper rRAPTOR
-algorithm rewrite is queued for a future release with the same output shape.
+docs for the exact contract. The serial implementation runs rRAPTOR
+(paper §4): a single reverse-chronological scan that reuses labels across
+departures rather than running N independent RAPTOR calls. The parallel
+paths (`.run_par()` / `.run_with_pool(...)`) keep the naïve-batch shape
+fanned across cores, since rRAPTOR is inherently sequential within a
+window.
 
 To translate index newtypes back to your adapter's external IDs, the bundled
 GTFS adapter exposes `GtfsTimetable::stop_id(stop_idx)` and
@@ -291,15 +294,30 @@ return it on drop. The same pool serves an arbitrary number of threads
 without per-thread bookkeeping.
 
 A measurement on the bundled Delhi feed (60-departure window, 09:00–10:00
-in 1-minute steps, M-series Apple Silicon, 8 cores):
+in 1-minute steps, M-series Apple Silicon, 8 cores). The serial column is
+rRAPTOR (paper §4 reverse-chronological scan), not the naïve batch:
 
-| Query                        | Serial   | Parallel | Speedup |
-|------------------------------|----------|----------|---------|
-| 2-trip with one interchange  | 2.38 ms  | 0.45 ms  | 5.3x    |
-| 3-trip across three lines    | 5.37 ms  | 0.83 ms  | 6.5x    |
+| Query                        | Serial (rRAPTOR) | Parallel (naïve batch) | Speedup |
+|------------------------------|------------------|------------------------|---------|
+| Direct, 1 trip               | 1.12 ms          | 195 µs                 | 5.7x    |
+| 2-trip with one interchange  | 1.35 ms          | 443 µs                 | 3.0x    |
+| 3-trip across three lines    | 1.84 ms          | 799 µs                 | 2.3x    |
 
-The win scales with departure count. For a single departure there is
-nothing to parallelise — `.run()` (single-departure) is unchanged.
+For wide windows on multicore the parallel path still wins, because
+rRAPTOR is sequential within a window. For single-core builds or
+narrow windows the serial rRAPTOR path wins.
+
+Compared with the previous naïve serial batch, rRAPTOR is markedly
+faster on non-trivial queries — the 2-trip case drops from 2.38 ms to
+1.35 ms (~43% faster) and the 3-trip case from 5.37 ms to 1.84 ms
+(~66% faster). The 1-trip case is the outlier: it's slightly slower
+than the old naïve serial (~547 µs → 1.12 ms) because rRAPTOR's per-τ
+overhead — the newly-active-stops scan and the label-bag insert checks
+— doesn't amortise on a single-route query. rRAPTOR wins where label
+reuse pays off, which is most non-trivial queries.
+
+For a single departure there is nothing to parallelise — `.run()`
+(single-departure) is unchanged.
 
 To opt out of Rayon (wasm, embedded, minimal builds), depend on raptor
 with `default-features = false`. The `RaptorCachePool` API stays
