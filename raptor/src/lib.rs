@@ -1199,11 +1199,23 @@ fn extract_target_journeys<L: Label>(
 }
 
 /// Run round-0 footpath relaxation followed by rounds `1..=transfers`
-/// against an already-seeded cache. Caller is responsible for setting
-/// up `marked_stops`, `labels`, `best_arrival`, `origin_set`, and
-/// `ever_reached` before calling. Shared by the per-call algorithm
+/// against an already-seeded cache. Shared by the per-call algorithm
 /// (which seeds a single τ) and the rRAPTOR scan (which re-seeds for
-/// each τ in descending order).
+/// each τ in descending order); the only difference between callers
+/// is the outer τ-loop that handles seeding.
+///
+/// **Caller invariants on entry:**
+///   - `marked_stops` contains the round-0 starting set: at minimum
+///     the sources, plus (for rRAPTOR) any stops where new trips just
+///     became catchable at the current τ.
+///   - `labels[0]` is seeded at every source with that source's
+///     departure label; the corresponding `best_arrival` and
+///     `ever_reached` bits are set.
+///   - `best_arrival` and `ever_reached` are coherent with `labels`
+///     (the helper reads and writes both).
+///
+/// On exit, `marked_stops` is empty (drained by the early-out check
+/// or by the natural marked-stops migration through rounds).
 #[allow(clippy::too_many_arguments)]
 fn run_raptor_rounds<T: Timetable + ?Sized, L: Label>(
     tt: &T,
@@ -1812,6 +1824,23 @@ fn filter_range_pareto_front<L: Label>(mut all: Vec<RangeJourney<L>>) -> Vec<Ran
 ///
 /// `departures` must be sorted descending and deduped (the
 /// `.depart_in_window(...)` builder normalises this).
+///
+/// **Why descending τ order:** for τ' < τ_prev, a journey valid at
+/// τ_prev is also valid at τ' (the same trip with depart ≥ τ_prev ≥
+/// τ' is still catchable). So descending order makes each new seed
+/// monotonically improve the bag, and no improvement ever needs to
+/// be undone.
+///
+/// **Why labels accumulate (cache reset only once):** the per-call
+/// algorithm resets between queries; rRAPTOR resets only at the start
+/// of the whole scan. Labels written at scan τ remain valid for any
+/// τ' < τ, so persisting them across scans is correct, not stale —
+/// and avoids re-deriving information already discovered.
+///
+/// **Why `best_arrival` accumulates too:** the per-round carry-forward
+/// overwrites `labels[k][X]` at the start of each round k, but
+/// `best_arrival` is never cleared. This gives the `pt_threshold`
+/// pruning a tight bound across τ scans.
 #[allow(dead_code)] // wired up in Task 5 of the rRAPTOR rollout
 fn raptor_range_rrap_arrival<T: Timetable + ?Sized>(
     tt: &T,
