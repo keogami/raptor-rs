@@ -1841,7 +1841,6 @@ fn filter_range_pareto_front<L: Label>(mut all: Vec<RangeJourney<L>>) -> Vec<Ran
 /// overwrites `labels[k][X]` at the start of each round k, but
 /// `best_arrival` is never cleared. This gives the `pt_threshold`
 /// pruning a tight bound across τ scans.
-#[allow(dead_code)] // wired up in Task 5 of the rRAPTOR rollout
 fn raptor_range_rrap_arrival<T: Timetable + ?Sized>(
     tt: &T,
     cache: &mut RaptorCache<ArrivalTime>,
@@ -2097,25 +2096,30 @@ where
     }
 }
 
-// ----- Stage 2b: RangeDeparture — terminal `.run()` -----
+// ----- Stage 2b: RangeDeparture, ArrivalTime — rRAPTOR -----
 
-impl<'tt, T, L> Query<'tt, T, L, RangeDeparture>
+impl<'tt, T> Query<'tt, T, ArrivalTime, RangeDeparture>
 where
     T: Timetable + Sized,
-    L: Label,
 {
     /// Execute the range query, allocating a fresh [`RaptorCache`].
-    pub fn run(self) -> Vec<RangeJourney<L>> {
-        let mut cache = RaptorCache::<L>::for_timetable(self.tt);
+    /// Runs rRAPTOR (single reverse-chronological scan reusing labels
+    /// across departures).
+    pub fn run(self) -> Vec<RangeJourney<ArrivalTime>> {
+        let mut cache = RaptorCache::<ArrivalTime>::for_timetable(self.tt);
         self.run_with_cache(&mut cache)
     }
 
-    /// Execute the range query, reusing `cache`.
-    pub fn run_with_cache(self, cache: &mut RaptorCache<L>) -> Vec<RangeJourney<L>> {
-        self.tt.raptor_range_with_cache(
+    /// Execute the range query, reusing `cache`. Runs rRAPTOR.
+    pub fn run_with_cache(
+        self,
+        cache: &mut RaptorCache<ArrivalTime>,
+    ) -> Vec<RangeJourney<ArrivalTime>> {
+        raptor_range_rrap_arrival(
+            self.tt,
             cache,
             self.max_transfers.0 as usize,
-            self.mode.departures,
+            &self.mode.departures,
             self.origins,
             self.targets,
         )
