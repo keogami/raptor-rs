@@ -32,7 +32,7 @@ Current CI presumably runs unit + proptests. Add:
 
 ### MSRV policy
 
-Pin a minimum supported Rust version. Current `rust-toolchain.toml` pins to a recent stable for development; the published crate should support older versions. Reasonable lower bound: 1.85 (Rust 2024 edition stable). Document the policy in `Cargo.toml` (`rust-version = "1.85"`) and add a CI matrix entry.
+Pin a minimum supported Rust version in `Cargo.toml` (`rust-version = "1.85"` would be a reasonable lower bound — Rust 2024 edition stable). Add a CI matrix entry that builds against MSRV alongside latest stable.
 
 ## Longer-term
 
