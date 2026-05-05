@@ -12,6 +12,21 @@ Real-time delays, cancellations, and added trips. Standard pattern: keep the sta
 
 Open questions: how to expose the overlay in the public API (a separate `Timetable` impl that wraps a `GtfsTimetable` + a delta? a builder method?), whether the overlay needs its own `Cargo` feature, and how to source updates (the `gtfs-rt` crate can decode protobuf feeds — wiring is straightforward, the design is the work).
 
+### Pickup / drop-off type flags
+
+GTFS `stop_times.pickup_type` and `drop_off_type` allow a feed to mark a scheduled stop as not-boardable (`pickup_type = 1`) or not-alightable (`drop_off_type = 1`) — common on long-distance rail with explicit "set down only" stops, or on airport shuttles that pick up at one terminal but don't drop there on the return. Vulture currently ignores both flags and treats every scheduled stop as boardable and alightable; on metros this is invisible (all flags are 0/0), but a long-distance feed could see vulture produce journeys the operator does not actually allow.
+
+Fix: gate the boarding scan in `Timetable::get_earliest_trip` on `pickup_type ≠ 1` and the alighting candidacy check on `drop_off_type ≠ 1`. The flags are per `(trip, stop_sequence)` so they fit naturally into the existing per-position trait accessors. Surfaced by [`docs/cross-impl-comparison.md`](../cross-impl-comparison.md) — `raptor-journey-planner` honours these.
+
+### Multi-day journey search
+
+A 23:00 query that needs an after-midnight or next-morning trip currently returns no journey because the `GtfsTimetable` is calendar-filtered to a single service date at construction. RAPTOR itself extends naturally across days; the `Timetable` just needs to know about tomorrow's services. Two shapes worth considering:
+
+- **Eager:** load N consecutive service days at construction. Simpler; uses more memory; arithmetic over `SecondOfDay` already permits values past 86400.
+- **Lazy:** when the algorithm exhausts the current day's service without finding a journey, roll forward into the next day's calendar and retry. Closer to what `raptor-journey-planner`'s `maxSearchDays = 3` does. More complex but pays only on overnight queries.
+
+Either way it's a `GtfsTimetable` builder option (`.with_overnight_days(usize)` or similar) plus algorithm-side handling of cross-midnight times. Real value for "last train home" and red-eye flight queries; nuisance otherwise.
+
 ### Accessibility flags
 
 GTFS exposes `wheelchair_boarding` on stops and `wheelchair_accessible` on trips. Add a query-level filter that drops trips/stops failing the requirement. Likely shape: a builder method `.require_wheelchair_accessible()` on the `Query` typestate that adds a per-trip predicate to `get_earliest_trip`. Should compose cleanly with the existing `Label` machinery — a wheelchair-aware journey is still arrival-time-optimal within the filtered subnetwork.
@@ -47,6 +62,14 @@ Currently one crate (`vulture`) with feature flags gating GTFS, parallel, and do
 - `vulture` — facade crate that re-exports the core + adapters via feature flags. Keeps `cargo add vulture` working.
 
 Worth doing if the dependency footprint of the GTFS adapter becomes a problem (e.g., for embedded or wasm users who only want the algorithm). Premature otherwise — the feature flags currently do the same job at zero cost.
+
+### Transfer Patterns
+
+Bast et al. (2010): for a given network and a representative query distribution, precompute the small set of stop-sequence patterns capable of producing optimal journeys between each origin–destination pair (or proxy thereof). Queries become bag-of-pattern lookups plus a few small RAPTOR scans, cutting query latency by an order of magnitude or more — at the cost of a pattern-database build that takes hours to days for a real network.
+
+`raptor-journey-planner` ships a `TransferPatternQuery` and a `TransferPatternRepository` backed by MySQL. For vulture this would be a separate algorithm path rather than a refinement of the RAPTOR core: at minimum a precomputation tool, a storage format, and a runtime query that reuses RAPTOR for the per-query local scans. Substantial — comparable in scope to the GTFS adapter or the proptest harness, not a mod of the existing code.
+
+Worth doing only when the network is stable and the query distribution is biased (a public route planner for the same city, run for years — yes; a one-shot analysis against an unfamiliar feed — no). Defer until there is a concrete user.
 
 ### McProfileRAPTOR for range queries
 
