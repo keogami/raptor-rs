@@ -400,7 +400,7 @@ by sharing work across departure times.
 reverse-chronological scan that reuses labels across departure
 events) is now the serial range-query path, wired through
 `Query<ArrivalTime, RangeDeparture>::run` /
-`.run_with_cache(&mut cache)` (rrap plan tasks T1–T8). Output shape
+`.run_with_cache(&mut cache)`. Output shape
 is unchanged from the v0.14 naïve batch — the same
 Pareto-filtered `Vec<RangeJourney>` profile — so callers don't need
 to migrate.

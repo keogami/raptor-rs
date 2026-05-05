@@ -2,8 +2,9 @@
 
 ## Unreleased
 
-Parallel range queries via Rayon, gated by a new default-on `parallel`
-feature.
+Two range-query improvements: rRAPTOR for the serial path (single
+reverse-chronological scan replacing the naïve batch), and a Rayon-based
+parallel batch behind a new default-on `parallel` feature flag.
 
 ### New API
 
@@ -48,7 +49,7 @@ is slightly slower (~547 µs → 1.12 ms) because the per-τ overhead
 doesn't amortise on a single-route query; rRAPTOR wins where label
 reuse pays off, which is most non-trivial queries.
 
-#### Breaking for custom-Label range queries
+### Breaking changes
 
 `Query<L, RangeDeparture>` no longer exposes `.run()` /
 `.run_with_cache()` for arbitrary `L: Label`; those are restricted to
