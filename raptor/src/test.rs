@@ -2228,3 +2228,111 @@ fn parallel_range_query_matches_serial() {
         assert_eq!(s.journey.plan, p.journey.plan);
     }
 }
+
+#[test]
+fn newly_active_stops_marks_only_in_window() {
+    use crate::newly_active_stops_into;
+    use fixedbitset::FixedBitSet;
+
+    // Two routes, each with three trips at distinct departures.
+    // Route 1 stops: A, B (trips depart A at 100, 200, 300).
+    // Route 2 stops: C, D (trips depart C at 150, 250, 350).
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+    enum S {
+        A,
+        B,
+        C,
+        D,
+    }
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+    enum R {
+        R1,
+        R2,
+    }
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+    enum Tr {
+        T1,
+        T2,
+        T3,
+        T4,
+        T5,
+        T6,
+    }
+
+    let tt = SimpleTimetable::new()
+        .route(
+            R::R1,
+            &[S::A, S::B],
+            &[
+                (
+                    Tr::T1,
+                    &[
+                        (SecondOfDay(100), SecondOfDay(100)),
+                        (SecondOfDay(110), SecondOfDay(110)),
+                    ],
+                ),
+                (
+                    Tr::T2,
+                    &[
+                        (SecondOfDay(200), SecondOfDay(200)),
+                        (SecondOfDay(210), SecondOfDay(210)),
+                    ],
+                ),
+                (
+                    Tr::T3,
+                    &[
+                        (SecondOfDay(300), SecondOfDay(300)),
+                        (SecondOfDay(310), SecondOfDay(310)),
+                    ],
+                ),
+            ],
+        )
+        .route(
+            R::R2,
+            &[S::C, S::D],
+            &[
+                (
+                    Tr::T4,
+                    &[
+                        (SecondOfDay(150), SecondOfDay(150)),
+                        (SecondOfDay(160), SecondOfDay(160)),
+                    ],
+                ),
+                (
+                    Tr::T5,
+                    &[
+                        (SecondOfDay(250), SecondOfDay(250)),
+                        (SecondOfDay(260), SecondOfDay(260)),
+                    ],
+                ),
+                (
+                    Tr::T6,
+                    &[
+                        (SecondOfDay(350), SecondOfDay(350)),
+                        (SecondOfDay(360), SecondOfDay(360)),
+                    ],
+                ),
+            ],
+        );
+
+    let mut marked = FixedBitSet::with_capacity(tt.n_stops());
+
+    // Window [180, 270): R1's T2 (200) and R2's T5 (250) qualify.
+    // Stops marked: A and B (R1 reaches both via T2), C and D (R2 reaches both via T5).
+    // T2 also has B at 210 and T5 has D at 260 — both fall in the window.
+    newly_active_stops_into(&tt, SecondOfDay(180), SecondOfDay(270), &mut marked);
+    assert!(marked.contains(tt.stop_idx_of(&S::A).idx()));
+    assert!(marked.contains(tt.stop_idx_of(&S::B).idx()));
+    assert!(marked.contains(tt.stop_idx_of(&S::C).idx()));
+    assert!(marked.contains(tt.stop_idx_of(&S::D).idx()));
+
+    // Empty window: nothing changes.
+    let mut marked2 = FixedBitSet::with_capacity(tt.n_stops());
+    newly_active_stops_into(&tt, SecondOfDay(500), SecondOfDay(500), &mut marked2);
+    assert_eq!(marked2.count_ones(..), 0);
+
+    // Window with no qualifying trip: nothing changes.
+    let mut marked3 = FixedBitSet::with_capacity(tt.n_stops());
+    newly_active_stops_into(&tt, SecondOfDay(120), SecondOfDay(140), &mut marked3);
+    assert_eq!(marked3.count_ones(..), 0);
+}

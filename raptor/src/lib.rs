@@ -1198,6 +1198,40 @@ fn extract_target_journeys<L: Label>(
     journeys
 }
 
+/// Mark stops where any route through them has a trip whose departure
+/// time at that position falls in `[lo, hi)`. Used by rRAPTOR between
+/// τ scans to find stops that need rescanning because new trips just
+/// became catchable.
+///
+/// `marked` is the destination bitset; bits already set are preserved.
+/// One `get_earliest_trip` lookup per (route, position) plus one
+/// `get_departure_time` if the lookup hits — overall
+/// O(n_routes × max_route_len) calls per invocation, each O(log
+/// n_trips_per_route) inside the trait impl.
+#[allow(dead_code)] // wired up in Task 4 of the rRAPTOR rollout
+fn newly_active_stops_into<T: Timetable + ?Sized>(
+    tt: &T,
+    lo: SecondOfDay,
+    hi: SecondOfDay,
+    marked: &mut FixedBitSet,
+) {
+    if lo >= hi {
+        return;
+    }
+    for r in 0..tt.n_routes() as u32 {
+        let route = RouteIdx::new(r);
+        let stops = tt.get_stops_after(route, 0);
+        for (pos_offset, &stop) in stops.iter().enumerate() {
+            let pos = pos_offset as u32;
+            if let Some(trip) = tt.get_earliest_trip(route, lo, pos)
+                && tt.get_departure_time(trip, pos) < hi
+            {
+                marked.insert(stop.idx());
+            }
+        }
+    }
+}
+
 /// Models a route-based transit network for the RAPTOR algorithm.
 ///
 /// Implement this trait to describe your transit network's topology and
