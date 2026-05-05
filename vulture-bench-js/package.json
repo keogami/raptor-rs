@@ -1,0 +1,20 @@
+{
+  "name": "vulture-bench-js",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Reference harness: run planarnetwork/raptor (raptor-journey-planner) against the same GTFS feeds and queries vulture's cross-city-bench uses, emitting comparable JSON.",
+  "type": "module",
+  "scripts": {
+    "harness": "node harness.mjs",
+    "perf": "tsx planar-perf.ts"
+  },
+  "dependencies": {
+    "raptor-journey-planner": "^2.3.1"
+  },
+  "devDependencies": {
+    "tsx": "^4.20.6"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

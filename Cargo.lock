@@ -2165,6 +2165,8 @@ dependencies = [
  "log",
  "rayon",
  "rstar",
+ "serde",
+ "serde_json",
  "smallvec",
  "thiserror",
 ]

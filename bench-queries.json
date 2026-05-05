@@ -1,0 +1,82 @@
+{
+  "configuration": {
+    "departure_seconds": 32400,
+    "max_transfers": 10,
+    "warmup_iters": 3,
+    "measure_iters": 50
+  },
+  "feeds": [
+    {
+      "name": "Delhi Metro",
+      "path": "aux/dmrc_gtfs.zip",
+      "service_date": "2024-01-15",
+      "walking_footpaths_m": null,
+      "queries": [
+        {
+          "label": "Dilshad Garden -> Shahdara (1 trip)",
+          "origin_ids": ["1"],
+          "target_ids": ["4"]
+        },
+        {
+          "label": "Dilshad Garden -> Vishwavidyalaya (2 trips)",
+          "origin_ids": ["1"],
+          "target_ids": ["44"]
+        },
+        {
+          "label": "Paschim Vihar West -> Ghitorni (3 trips)",
+          "origin_ids": ["29"],
+          "target_ids": ["65"]
+        }
+      ]
+    },
+    {
+      "name": "Helsinki HSL",
+      "path": "aux/external/helsinki.zip",
+      "service_date": "2026-05-04",
+      "walking_footpaths_m": 500.0,
+      "queries": [
+        {
+          "label": "Kamppi metro -> Itäkeskus metro (M1/M2 line, direct)",
+          "origin_ids": ["1040601"],
+          "target_ids": ["1453601"]
+        }
+      ]
+    },
+    {
+      "name": "Berlin VBB",
+      "path": "aux/external/berlin.zip",
+      "service_date": "2026-05-04",
+      "walking_footpaths_m": null,
+      "queries": [
+        {
+          "label": "Berlin Hauptbahnhof -> Alexanderplatz (hand-picked eastbound S-Bahn platforms)",
+          "origin_ids": ["de:11000:900003201:1:50"],
+          "target_ids": ["de:11000:900100003:1:50"]
+        }
+      ]
+    },
+    {
+      "name": "Paris IDFM",
+      "path": "aux/external/paris.zip",
+      "service_date": "2026-05-04",
+      "walking_footpaths_m": null,
+      "queries": [
+        {
+          "label": "Châtelet -> Gare du Nord",
+          "origin_ids": ["IDFM:monomodalStopPlace:45102"],
+          "target_ids": ["IDFM:monomodalStopPlace:462394"]
+        },
+        {
+          "label": "Châtelet -> La Défense",
+          "origin_ids": ["IDFM:monomodalStopPlace:45102"],
+          "target_ids": ["IDFM:monomodalStopPlace:470549"]
+        },
+        {
+          "label": "Châtelet -> Versailles Rive Droite",
+          "origin_ids": ["IDFM:monomodalStopPlace:45102"],
+          "target_ids": ["IDFM:monomodalStopPlace:44602"]
+        }
+      ]
+    }
+  ]
+}

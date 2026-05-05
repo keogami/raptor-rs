@@ -7,3 +7,10 @@
 # IDFM, Berlin VBB, etc. — must be downloaded by the user; see
 # docs/benchmarks.md and scripts/fetch-bench-feeds.sh.
 /aux/external/
+
+# Node deps for the cross-implementation comparison harness. The
+# checked-in package.json + harness.mjs are reproducible; node_modules
+# is not.
+/vulture-bench-js/node_modules/
+/vulture-bench-js/results/
+/vulture-bench-js/package-lock.json
