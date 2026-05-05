@@ -3,13 +3,13 @@ use gtfs_structures::Gtfs;
 use jiff::civil::{Date, date};
 use raptor::gtfs::GtfsTimetable;
 use raptor::{Duration, SecondOfDay};
-use raptor::{RaptorCache, Timetable};
+use raptor::{RaptorCache, RaptorCachePool, Timetable};
 use std::hint::black_box;
 
 const GTFS_PATH: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/../aux/dmrc_gtfs.zip");
 
 // Departure time: 09:00:00 in seconds since midnight.
-const DEPARTURE_TIME: usize = 9 * 3600;
+const DEPARTURE_TIME: SecondOfDay = SecondOfDay::hms(9, 0, 0);
 
 // A Monday inside the bundled Delhi feed's calendar window
 // (which ends 2025-12-31).
@@ -47,7 +47,7 @@ fn bench_gtfs_load(c: &mut Criterion) {
 
 fn bench_gtfs_query(c: &mut Criterion) {
     let gtfs = Gtfs::new(GTFS_PATH).unwrap();
-    let timetable = GtfsTimetable::new(&gtfs).unwrap();
+    let timetable = GtfsTimetable::new(&gtfs, service_date()).unwrap();
     let mut cache = RaptorCache::for_timetable(&timetable);
 
     let mut group = c.benchmark_group("gtfs_query");
@@ -80,5 +80,67 @@ fn bench_gtfs_query(c: &mut Criterion) {
     group.finish();
 }
 
-criterion_group!(gtfs_benches, bench_gtfs_load, bench_gtfs_query);
+/// Range query (rRAPTOR-shape) across a 60-departure window: 09:00 to
+/// 10:00 in 1-minute steps. Compares serial `.run_with_cache(&mut cache)`
+/// against parallel `.run_with_pool(&pool)`. The win comes from
+/// fanning the per-departure work across cores.
+fn bench_gtfs_range_query(c: &mut Criterion) {
+    let gtfs = Gtfs::new(GTFS_PATH).unwrap();
+    let timetable = GtfsTimetable::new(&gtfs, service_date()).unwrap();
+    let mut cache = RaptorCache::for_timetable(&timetable);
+    let pool = RaptorCachePool::for_timetable(&timetable);
+
+    // 09:00–10:00 in 1-minute steps = 60 departures.
+    let window_start = SecondOfDay::hms(9, 0, 0);
+    let window_end = SecondOfDay::hms(10, 0, 0);
+    let departures: Vec<SecondOfDay> = SecondOfDay::every(window_start, window_end, 60).collect();
+
+    let mut group = c.benchmark_group("gtfs_range");
+    for &(name, start_id, target_id) in QUERIES {
+        let start = timetable.stop_idx(start_id).expect("unknown start stop");
+        let target = timetable.stop_idx(target_id).expect("unknown target stop");
+
+        group.bench_with_input(
+            BenchmarkId::new("serial", name),
+            &(start, target),
+            |b, &(start, target)| {
+                b.iter(|| {
+                    let profile = timetable
+                        .query()
+                        .from(&[(start, Duration::ZERO)])
+                        .to(&[(target, Duration::ZERO)])
+                        .max_transfers(10)
+                        .depart_in_window(departures.iter().copied())
+                        .run_with_cache(&mut cache);
+                    black_box(&profile);
+                });
+            },
+        );
+
+        group.bench_with_input(
+            BenchmarkId::new("parallel", name),
+            &(start, target),
+            |b, &(start, target)| {
+                b.iter(|| {
+                    let profile = timetable
+                        .query()
+                        .from(&[(start, Duration::ZERO)])
+                        .to(&[(target, Duration::ZERO)])
+                        .max_transfers(10)
+                        .depart_in_window(departures.iter().copied())
+                        .run_with_pool(&pool);
+                    black_box(&profile);
+                });
+            },
+        );
+    }
+    group.finish();
+}
+
+criterion_group!(
+    gtfs_benches,
+    bench_gtfs_load,
+    bench_gtfs_query,
+    bench_gtfs_range_query
+);
 criterion_main!(gtfs_benches);

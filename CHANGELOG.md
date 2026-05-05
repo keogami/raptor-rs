@@ -1,5 +1,39 @@
 # Changelog
 
+## Unreleased
+
+Parallel range queries via Rayon, gated by a new default-on `parallel`
+feature.
+
+### New API
+
+- `pub struct RaptorCachePool<L>` — a `Sync` freelist of `RaptorCache`s
+  sized for one timetable. `for_timetable(&tt)` / `with_capacity(n_stops,
+  n_routes)` constructors; `checkout()` returns a `PooledCache<'_, L>`
+  RAII guard that derefs to `&mut RaptorCache<L>` and returns the cache
+  on drop. Available unconditionally — works with std threads, async
+  tasks, or Rayon.
+- `Query<RangeDeparture>::run_par() -> Vec<RangeJourney<L>>` — fans the
+  per-departure work across Rayon's global thread pool. Allocates an
+  internal pool. Available with the `parallel` feature.
+- `Query<RangeDeparture>::run_with_pool(&pool) -> Vec<RangeJourney<L>>`
+  — same parallelism, caller-supplied pool. Available with the
+  `parallel` feature.
+
+The serial `.run()` / `.run_with_cache(&mut cache)` paths are unchanged.
+
+### Performance
+
+60-departure window on the bundled Delhi feed (Apple Silicon, 8 cores):
+2-trip query 2.38 ms → 0.45 ms (5.3x); 3-trip query 5.37 ms → 0.83 ms
+(6.5x). Speedup scales with the number of departures in the window.
+
+### Cargo features
+
+- `parallel` (new, default-on) — pulls in `rayon`, gates `.run_par()` /
+  `.run_with_pool(...)`. Opt out with `default-features = false` for
+  wasm or minimal builds; `RaptorCachePool` itself stays available.
+
 ## [0.14.0] — 2026-05-05
 
 API ergonomics pass. The query surface collapses from six methods to one

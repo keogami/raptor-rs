@@ -55,7 +55,10 @@
 //! For server use cases doing many queries against the same timetable,
 //! allocate a [`RaptorCache`] once and pass it to `.run_with_cache(...)`
 //! at the end of each builder chain — amortises scratch-buffer allocation
-//! across queries.
+//! across queries. For multi-threaded workloads, [`RaptorCachePool`] is
+//! a `Sync` freelist of caches; range queries can also fan their
+//! per-departure work across cores via `.run_par()` /
+//! `.run_with_pool(&pool)` (under the default-on `parallel` feature).
 //!
 //! # Implementing [`Timetable`] for a custom backend
 //!
@@ -1645,11 +1648,13 @@ pub trait Timetable {
     /// directly — use [`Timetable::query`]`.depart_in_window(...)`
     /// instead.
     ///
-    /// Naïve batch implementation today: calls the per-departure
-    /// algorithm once per `departures` entry, sharing only the
-    /// `RaptorCache`. A real rRAPTOR (reverse-chronological scan
-    /// reusing labels across departure events) is queued; the
-    /// output shape is intentionally the one rRAPTOR will produce.
+    /// Naïve batch implementation: calls the per-departure algorithm
+    /// once per `departures` entry, sharing only the `RaptorCache`.
+    /// For a parallel batch (per-departure work fanned across cores)
+    /// see [`Query::run_par`] / [`Query::run_with_pool`]. A real rRAPTOR
+    /// (reverse-chronological scan reusing labels across departure
+    /// events) is queued as a longer-term replacement; the output shape
+    /// is intentionally the one rRAPTOR will produce.
     #[doc(hidden)]
     fn raptor_range_with_cache<L: Label>(
         &self,

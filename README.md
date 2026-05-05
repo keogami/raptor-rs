@@ -29,9 +29,11 @@ The public surface is small. Implement (or use) the `Timetable` trait to
 describe a transit network – `GtfsTimetable` does this for any GTFS feed —
 then build queries with `tt.query().from(...).to(...).depart_at(...).run()`.
 A `RaptorCache` reuses scratch allocations across queries against the same
-timetable, useful for server workloads. Per-leg trip and timing
-reconstruction is opt-in via `journey.with_timing(...)`; `Journey.plan` on
-its own is just `(route, alight stop)` topology.
+timetable, useful for server workloads; a `RaptorCachePool` does the same
+across threads, and range queries can fan their per-departure work across
+cores via `.run_par()` (under the default-on `parallel` feature). Per-leg
+trip and timing reconstruction is opt-in via `journey.with_timing(...)`;
+`Journey.plan` on its own is just `(route, alight stop)` topology.
 
 Things you can usually ignore until you need them: the `Label` trait
 (default is fine for normal routing); the `Timetable` trait internals
@@ -253,7 +255,55 @@ the count-only equivalent.
 
 The cache is reset at the start of each call but retains its heap
 allocations. A single `RaptorCache` is not thread-safe; give each worker
-thread its own.
+thread its own — or hand them a shared `RaptorCachePool` (next section).
+
+## Parallel queries
+
+The `parallel` feature (on by default) brings in [Rayon](https://crates.io/crates/rayon)
+and unlocks two parallel entry points for range queries:
+
+```rust,ignore
+use raptor::{RaptorCachePool, SecondOfDay, Timetable};
+
+// One pool, sized for this timetable, shared across many range queries.
+let pool = RaptorCachePool::for_timetable(&timetable);
+
+let profile = timetable
+    .query()
+    .from(start)
+    .to(end)
+    .max_transfers(10)
+    .depart_in_window(SecondOfDay::every(
+        SecondOfDay::hms(17, 0, 0),
+        SecondOfDay::hms(18, 0, 0),
+        60,
+    ))
+    .run_with_pool(&pool);   // fans across Rayon's global thread pool
+```
+
+`.run_par()` is the no-pool shortcut (allocates an internal pool for the
+call, then drops it). Output of `.run_par()` / `.run_with_pool(&pool)` is
+identical to the serial `.run()`; only the per-departure work fans out.
+
+`RaptorCachePool` is also useful without Rayon — it's `Sync`, so each
+worker thread (or async task) can `.checkout()` a cache for one query and
+return it on drop. The same pool serves an arbitrary number of threads
+without per-thread bookkeeping.
+
+A measurement on the bundled Delhi feed (60-departure window, 09:00–10:00
+in 1-minute steps, M-series Apple Silicon, 8 cores):
+
+| Query                        | Serial   | Parallel | Speedup |
+|------------------------------|----------|----------|---------|
+| 2-trip with one interchange  | 2.38 ms  | 0.45 ms  | 5.3x    |
+| 3-trip across three lines    | 5.37 ms  | 0.83 ms  | 6.5x    |
+
+The win scales with departure count. For a single departure there is
+nothing to parallelise — `.run()` (single-departure) is unchanged.
+
+To opt out of Rayon (wasm, embedded, minimal builds), depend on raptor
+with `default-features = false`. The `RaptorCachePool` API stays
+available; only `.run_par()` / `.run_with_pool(...)` are gated off.
 
 ## Implementing `Timetable` for a custom backend
 
