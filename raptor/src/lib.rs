@@ -154,28 +154,41 @@ pub mod labels;
 /// GTFS feed — for tests, custom data sources, and toy examples.
 pub mod manual;
 
-pub use cache::PooledCache;
-pub use cache::RaptorCache;
-pub use cache::RaptorCachePool;
-pub use endpoints::Endpoints;
-pub use endpoints::IntoEndpoints;
-pub use ids::RouteIdx;
-pub use ids::StopIdx;
-pub use ids::TripIdx;
+// Central items: the trait, the builder, the result.
+pub use timetable::Timetable;
+
+pub use query::Query;
+pub use query::RangeJourney;
+
 pub use journey::Journey;
 pub use journey::TimedLeg;
 pub use journey::TimingError;
+
+// Cache reuse: scratch buffers for repeated queries.
+pub use cache::PooledCache;
+pub use cache::RaptorCache;
+pub use cache::RaptorCachePool;
+
+// Label trait + the default single-criterion impl.
 pub use label::ArrivalTime;
 pub use label::Label;
+
+// Query builder typestate markers.
 pub use query::NeedsDeparture;
-pub use query::Query;
 pub use query::RangeDeparture;
-pub use query::RangeJourney;
 pub use query::SingleDeparture;
+
+// Endpoints — query input.
+pub use endpoints::Endpoints;
+pub use endpoints::IntoEndpoints;
+
+// Newtypes for indices and time quantities.
+pub use ids::RouteIdx;
+pub use ids::StopIdx;
+pub use ids::TripIdx;
 pub use time::Duration;
 pub use time::SecondOfDay;
 pub use time::Transfers;
-pub use timetable::Timetable;
 
 #[cfg(test)]
 mod test;
