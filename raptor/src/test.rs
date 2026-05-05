@@ -2231,7 +2231,7 @@ fn parallel_range_query_matches_serial() {
 
 #[test]
 fn newly_active_stops_marks_only_in_window() {
-    use crate::newly_active_stops_into;
+    use crate::algorithm::range::newly_active_stops_into;
     use fixedbitset::FixedBitSet;
 
     // Two routes, each with three trips at distinct departures.
