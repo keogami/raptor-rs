@@ -1741,47 +1741,6 @@ pub trait Timetable {
         }
         front
     }
-
-    /// Implementation entry point for [`Query::run`] in the
-    /// [`RangeDeparture`] state. Public-but-hidden so the typestate
-    /// builder can dispatch into the algorithm. Don't call this
-    /// directly — use [`Timetable::query`]`.depart_in_window(...)`
-    /// instead.
-    ///
-    /// Naïve batch implementation: calls the per-departure algorithm
-    /// once per `departures` entry, sharing only the `RaptorCache`.
-    /// For a parallel batch (per-departure work fanned across cores)
-    /// see [`Query::run_par`] / [`Query::run_with_pool`]. A real rRAPTOR
-    /// (reverse-chronological scan reusing labels across departure
-    /// events) is queued as a longer-term replacement; the output shape
-    /// is intentionally the one rRAPTOR will produce.
-    #[doc(hidden)]
-    fn raptor_range_with_cache<L: Label>(
-        &self,
-        cache: &mut RaptorCache<L>,
-        transfers: usize,
-        departures: impl IntoIterator<Item = SecondOfDay>,
-        origins: impl IntoEndpoints,
-        targets: impl IntoEndpoints,
-    ) -> Vec<RangeJourney<L>>
-    where
-        Self: Sized,
-    {
-        let origins = origins.into_endpoints();
-        let targets = targets.into_endpoints();
-        let origins = origins.as_slice();
-        let targets = targets.as_slice();
-        let mut all: Vec<RangeJourney<L>> = Vec::new();
-        for depart in departures {
-            let journeys =
-                self.raptor_with_cache_and_label(cache, transfers, depart, origins, targets);
-            for j in journeys {
-                all.push(RangeJourney { depart, journey: j });
-            }
-        }
-
-        filter_range_pareto_front(all)
-    }
 }
 
 /// Pareto-profile filter for range-query output: keep entries that are
@@ -1983,6 +1942,10 @@ pub struct RangeDeparture {
 ///   [`RangeDeparture`]) the only further method is [`Query::run`] —
 ///   plus [`Query::run_with_cache`] for explicit cache reuse. The
 ///   return type of `.run()` matches the departure mode.
+/// - `Query<L, RangeDeparture>` for custom `L != ArrivalTime` exposes
+///   only `.run_par()` / `.run_with_pool()` (with the `parallel`
+///   feature). The serial rRAPTOR specialisation only fires for
+///   `L = ArrivalTime`.
 ///
 /// Type parameters:
 ///
