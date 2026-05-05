@@ -2178,3 +2178,53 @@ fn pool_is_sync_across_threads() {
         idle_caches
     );
 }
+
+#[cfg(feature = "parallel")]
+#[test]
+fn parallel_range_query_matches_serial() {
+    let tt = pool_test_timetable();
+    let a = tt.stop_idx_of(&'A');
+    let d = tt.stop_idx_of(&'D');
+
+    let departures: Vec<SecondOfDay> = (0..=120).step_by(15).map(SecondOfDay).collect();
+
+    let serial = tt
+        .query()
+        .from(a)
+        .to(d)
+        .max_transfers(3)
+        .depart_in_window(departures.iter().copied())
+        .run();
+
+    let parallel = tt
+        .query()
+        .from(a)
+        .to(d)
+        .max_transfers(3)
+        .depart_in_window(departures.iter().copied())
+        .run_par();
+
+    assert_eq!(serial.len(), parallel.len(), "front sizes differ");
+    // The Pareto front filter sorts deterministically by (later depart,
+    // fewer transfers, earlier arrival), so output ordering matches.
+    for (s, p) in serial.iter().zip(&parallel) {
+        assert_eq!(s.depart, p.depart);
+        assert_eq!(s.journey.plan, p.journey.plan);
+        assert_eq!(s.journey.arrival(), p.journey.arrival());
+    }
+
+    // run_with_pool should match too, with reusable pool.
+    let pool = RaptorCachePool::for_timetable(&tt);
+    let parallel_pooled = tt
+        .query()
+        .from(a)
+        .to(d)
+        .max_transfers(3)
+        .depart_in_window(departures.iter().copied())
+        .run_with_pool(&pool);
+    assert_eq!(serial.len(), parallel_pooled.len());
+    for (s, p) in serial.iter().zip(&parallel_pooled) {
+        assert_eq!(s.depart, p.depart);
+        assert_eq!(s.journey.plan, p.journey.plan);
+    }
+}

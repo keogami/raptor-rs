@@ -1675,36 +1675,40 @@ pub trait Timetable {
             }
         }
 
-        // Pareto profile filter on (later depart, fewer transfers,
-        // dominated label). Sort so that the entries we'd prefer to
-        // keep come first: later departure first (don't make the user
-        // leave earlier than necessary), then fewer transfers, then
-        // earlier arrival.
-        all.sort_by(|a, b| {
-            b.depart
-                .cmp(&a.depart)
-                .then(a.journey.plan.len().cmp(&b.journey.plan.len()))
-                .then(a.journey.arrival().cmp(&b.journey.arrival()))
-        });
-        let mut front: Vec<RangeJourney<L>> = Vec::with_capacity(all.len());
-        'outer: for r in all {
-            for f in &front {
-                if f.depart >= r.depart
-                    && f.journey.plan.len() <= r.journey.plan.len()
-                    && f.journey.label.dominates(&r.journey.label)
-                {
-                    continue 'outer;
-                }
-            }
-            front.retain(|f| {
-                !(r.depart >= f.depart
-                    && r.journey.plan.len() <= f.journey.plan.len()
-                    && r.journey.label.dominates(&f.journey.label))
-            });
-            front.push(r);
-        }
-        front
+        filter_range_pareto_front(all)
     }
+}
+
+/// Pareto-profile filter for range-query output: keep entries that are
+/// not weakly dominated by another on `(later depart, fewer transfers,
+/// dominated label)`. Sort so the entries we'd prefer to keep come
+/// first (later departure, fewer transfers, earlier arrival), then
+/// sweep with mutual-domination removal.
+fn filter_range_pareto_front<L: Label>(mut all: Vec<RangeJourney<L>>) -> Vec<RangeJourney<L>> {
+    all.sort_by(|a, b| {
+        b.depart
+            .cmp(&a.depart)
+            .then(a.journey.plan.len().cmp(&b.journey.plan.len()))
+            .then(a.journey.arrival().cmp(&b.journey.arrival()))
+    });
+    let mut front: Vec<RangeJourney<L>> = Vec::with_capacity(all.len());
+    'outer: for r in all {
+        for f in &front {
+            if f.depart >= r.depart
+                && f.journey.plan.len() <= r.journey.plan.len()
+                && f.journey.label.dominates(&r.journey.label)
+            {
+                continue 'outer;
+            }
+        }
+        front.retain(|f| {
+            !(r.depart >= f.depart
+                && r.journey.plan.len() <= f.journey.plan.len()
+                && r.journey.label.dominates(&f.journey.label))
+        });
+        front.push(r);
+    }
+    front
 }
 
 /// One entry in a range-query profile: a departure time paired with
@@ -1889,6 +1893,57 @@ where
             self.origins,
             self.targets,
         )
+    }
+}
+
+#[cfg(feature = "parallel")]
+impl<'tt, T, L> Query<'tt, T, L, RangeDeparture>
+where
+    T: Timetable + Sized + Sync,
+    L: Label + Send + Sync,
+{
+    /// Execute the range query in parallel, allocating a fresh
+    /// [`RaptorCachePool`]. Per-departure work fans out across Rayon's
+    /// global thread pool. Output is identical to [`Self::run`].
+    ///
+    /// Available with the `parallel` feature (on by default). For
+    /// repeated range queries against the same timetable, prefer
+    /// [`Self::run_with_pool`] to amortise pool construction.
+    pub fn run_par(self) -> Vec<RangeJourney<L>> {
+        let pool = RaptorCachePool::<L>::for_timetable(self.tt);
+        self.run_with_pool(&pool)
+    }
+
+    /// Execute the range query in parallel, reusing caches from `pool`.
+    /// `pool` must be sized for `self`'s timetable; mismatch panics
+    /// inside the per-departure scan.
+    pub fn run_with_pool(self, pool: &RaptorCachePool<L>) -> Vec<RangeJourney<L>> {
+        use rayon::prelude::*;
+
+        let transfers = self.max_transfers.0 as usize;
+        let origins = self.origins;
+        let targets = self.targets;
+        let tt = self.tt;
+        let departures = self.mode.departures;
+
+        let all: Vec<RangeJourney<L>> = departures
+            .par_iter()
+            .flat_map_iter(|&depart| {
+                let mut cache = pool.checkout();
+                let journeys = tt.raptor_with_cache_and_label(
+                    &mut *cache,
+                    transfers,
+                    depart,
+                    &origins,
+                    &targets,
+                );
+                journeys
+                    .into_iter()
+                    .map(move |j| RangeJourney { depart, journey: j })
+            })
+            .collect();
+
+        filter_range_pareto_front(all)
     }
 }
 
