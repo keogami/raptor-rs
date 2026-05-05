@@ -1,9 +1,9 @@
-//! Canned [`Label`](crate::Label) implementations.
+//! Canned [`Label`] implementations.
 //!
 //! Single-criterion routing uses [`crate::ArrivalTime`] (re-exported at
 //! the crate root). For multi-criterion routing, this module ships a
 //! small set of vetted impls users can drive the algorithm with via
-//! [`Timetable::raptor_with_label`](crate::Timetable::raptor_with_label).
+//! [`Timetable::query_with_label`](crate::Timetable::query_with_label).
 //!
 //! Custom impls live in user code — see the [`Label`]
 //! trait docs for the requirements.

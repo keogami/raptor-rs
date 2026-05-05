@@ -399,7 +399,10 @@ impl<'gtfs> GtfsTimetable<'gtfs> {
     }
 
     /// Returns the child platforms of a parent station as a slice ready
-    /// to pass to [`Timetable::raptor`] as origins or targets.
+    /// to pass to [`Query::from`] / [`Query::to`] as origins or targets.
+    ///
+    /// [`Query::from`]: crate::Query::from
+    /// [`Query::to`]: crate::Query::to
     ///
     /// Each entry is `(platform_stop_idx, walk_time)` where `walk_time`
     /// defaults to 0 (the user is willing to use any platform without

@@ -1155,8 +1155,8 @@ fn reconstruct_journey(
 /// Models a route-based transit network for the RAPTOR algorithm.
 ///
 /// Implement this trait to describe your transit network's topology and
-/// schedule. The algorithm itself is provided as a default method
-/// ([`Timetable::raptor`]).
+/// schedule. The algorithm itself is invoked via the
+/// [`Timetable::query`] builder.
 ///
 /// Identifiers are dense `u32` indices ([`StopIdx`], [`RouteIdx`],
 /// [`TripIdx`]). Adapters intern from external IDs (e.g. GTFS string IDs)
@@ -1707,15 +1707,16 @@ pub trait Timetable {
 }
 
 /// One entry in a range-query profile: a departure time paired with
-/// the [`Journey`] it produces. Returned by
-/// [`Timetable::raptor_range`] / [`Timetable::raptor_range_with_cache`].
+/// the [`Journey`] it produces. Returned by [`Query::run`] /
+/// [`Query::run_with_cache`] when the builder was configured with
+/// [`Query::depart_in_window`].
 #[derive(Debug, Clone)]
 pub struct RangeJourney<L: Label = ArrivalTime> {
     /// The departure time this journey assumes — the user leaves the
     /// origin (or starts the origin walk) at this time.
     pub depart: SecondOfDay,
     /// The journey itself, as if `depart` had been passed to
-    /// [`Timetable::raptor`] directly.
+    /// [`Query::depart_at`] directly.
     pub journey: Journey<L>,
 }
 
@@ -1890,7 +1891,7 @@ where
     }
 }
 
-/// Reusable scratch buffers for [`Timetable::raptor_with_cache`].
+/// Reusable scratch buffers for [`Query::run_with_cache`].
 ///
 /// A `RaptorCache` is sized for a specific timetable's stop and route counts.
 /// Construct with [`RaptorCache::for_timetable`]; passing it to a query
