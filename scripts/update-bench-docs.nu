@@ -1,7 +1,7 @@
 #!/usr/bin/env nu
 
 print "Running benchmarks..."
-cargo bench -p raptor --features internal --bench raptor
+cargo bench -p vulture --features internal --bench raptor
 
 let csvs = glob "target/**/new/raw.csv"
 
