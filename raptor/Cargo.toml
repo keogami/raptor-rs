@@ -14,7 +14,7 @@ path = "src/lib.rs"
 [features]
 internal = []
 dotgraph = ["dep:dot_graph"]
-gtfs-bench = []
+gtfs = ["dep:gtfs-structures"]
 
 [dev-dependencies]
 anyhow = "1.0.100"
@@ -29,11 +29,15 @@ harness = false
 [[bench]]
 name = "gtfs"
 harness = false
-required-features = ["gtfs-bench"]
+required-features = ["gtfs"]
+
+[[example]]
+name = "gtfs-timetable"
+required-features = ["gtfs"]
 
 [dependencies]
 dot_graph = { version = "0.2", optional = true }
-gtfs-structures = "0.46.1"
+gtfs-structures = { version = "0.46.1", optional = true }
 log = "0.4.29"
 smallvec = "1.15.1"
 thiserror = "2.0.18"
