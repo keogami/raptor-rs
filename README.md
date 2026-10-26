@@ -48,7 +48,13 @@ board `R3` at `C`, get off at `D`.
 
 ## GTFS Support
 
-A ready-made implementation for GTFS feeds ships in the `gtfs` module:
+A ready-made implementation for GTFS feeds ships in the `gtfs` module, gated
+behind the off-by-default `gtfs` feature so the core crate stays free of the
+`gtfs-structures` dependency:
+
+```bash
+cargo add raptor --features gtfs
+```
 
 ```rust
 use gtfs_structures::Gtfs;
@@ -64,7 +70,7 @@ let journeys = timetable.raptor(10, 69300, "stop_a", "stop_b");
 There's also a runnable example:
 
 ```bash
-cargo run --example gtfs-timetable path/to/gtfs.zip stop_a stop_b
+cargo run --example gtfs-timetable --features gtfs path/to/gtfs.zip stop_a stop_b
 ```
 
 ## License

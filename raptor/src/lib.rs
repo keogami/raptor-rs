@@ -6,7 +6,8 @@
 //! between arrival time and number of transfers. Implement the [`Timetable`] trait
 //! for your transit data, then call [`Timetable::raptor`] to query for journeys.
 //!
-//! A ready-made implementation for GTFS feeds is available in the [`gtfs`] module.
+//! A ready-made implementation for GTFS feeds is available in the `gtfs` module
+//! when the `gtfs` cargo feature is enabled.
 //!
 //! # Example
 //!
@@ -24,6 +25,7 @@ use std::borrow::Cow;
 use std::collections::{BTreeMap, BTreeSet};
 use std::fmt::Debug;
 
+#[cfg(feature = "gtfs")]
 pub mod gtfs;
 /// In-memory timetable for testing and simple use cases.
 pub mod simple;
